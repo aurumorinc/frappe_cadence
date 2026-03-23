@@ -51,8 +51,18 @@ class Campaign(Document):
 	def update_email_campaigns(self):
 		email_campaigns = frappe.get_all("Email Campaign", filters={"campaign_name": self.name}, pluck="name")
 		
+		# Map existing schedules from this campaign
+		master_schedules = []
 		template_map = {}
 		for row in self.get("campaign_schedules"):
+			master_schedules.append({
+				"email_template": row.email_template,
+				"send_after_days": row.send_after_days,
+				"subject_apollo_id": row.subject_apollo_id,
+				"response_apollo_id": row.response_apollo_id,
+				"reference_doc": row.reference_doc,
+				"reference_docname": row.reference_docname
+			})
 			template_map[row.email_template] = {
 				"subject_apollo_id": row.subject_apollo_id,
 				"response_apollo_id": row.response_apollo_id
@@ -62,6 +72,7 @@ class Campaign(Document):
 			ec = frappe.get_doc("Email Campaign", ec_name)
 			dirty = False
 			
+			# Check for apollo id updates
 			for ec_row in ec.get("campaign_email_schedules"):
 				if ec_row.email_template in template_map:
 					if not ec_row.reference_docname:
@@ -72,6 +83,20 @@ class Campaign(Document):
 						if ec_row.response_apollo_id != data["response_apollo_id"]:
 							ec_row.response_apollo_id = data["response_apollo_id"]
 							dirty = True
+							
+			# Check for new schedules added to the master campaign
+			existing_keys = {(r.email_template, r.send_after_days) for r in ec.get("campaign_email_schedules")}
+			new_rows_added = False
+			
+			for m_row in master_schedules:
+				key = (m_row["email_template"], m_row["send_after_days"])
+				if key not in existing_keys:
+					ec.append("campaign_email_schedules", m_row)
+					dirty = True
+					new_rows_added = True
+					
+			if new_rows_added and ec.status != "Draft":
+				ec.status = "Draft"
 			
 			if dirty:
 				ec.save(ignore_permissions=True)
