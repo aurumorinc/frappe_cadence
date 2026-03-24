@@ -9,8 +9,6 @@
   "send_after_days",
   "subject",
   "response",
-  "subject_apollo_id",
-  "response_apollo_id",
   "reference_doc",
   "reference_docname"
  ],
@@ -41,16 +39,6 @@
    "fieldtype": "Text Editor",
    "label": "Response",
    "depends_on": "eval:parent.doctype == 'Email Campaign'"
-  },
-  {
-   "fieldname": "subject_apollo_id",
-   "fieldtype": "Data",
-   "label": "Subject Apollo ID"
-  },
-  {
-   "fieldname": "response_apollo_id",
-   "fieldtype": "Data",
-   "label": "Response Apollo ID"
   },
   {
    "fieldname": "reference_doc",

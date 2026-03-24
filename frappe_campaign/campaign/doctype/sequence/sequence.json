@@ -1,0 +1,85 @@
+{
+ "actions": [],
+ "creation": "2024-03-24 18:40:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "campaign",
+  "sender",
+  "column_break_3",
+  "emailer_campaign_id",
+  "email_account_id",
+  "sequence_steps_section",
+  "sequence_steps"
+ ],
+ "fields": [
+  {
+   "fieldname": "campaign",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Campaign",
+   "options": "Campaign",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sender",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Sender",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "emailer_campaign_id",
+   "fieldtype": "Data",
+   "label": "Emailer Campaign ID",
+   "reqd": 1
+  },
+  {
+   "fieldname": "email_account_id",
+   "fieldtype": "Data",
+   "label": "Email Account ID",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sequence_steps_section",
+   "fieldtype": "Section Break",
+   "label": "Sequence Steps"
+  },
+  {
+   "fieldname": "sequence_steps",
+   "fieldtype": "Table",
+   "label": "Sequence Steps",
+   "options": "Sequence Step"
+  }
+ ],
+ "links": [],
+ "modified": "2024-03-24 18:40:00.000000",
+ "modified_by": "Administrator",
+ "module": "Campaign",
+ "name": "Sequence",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "quick_entry": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

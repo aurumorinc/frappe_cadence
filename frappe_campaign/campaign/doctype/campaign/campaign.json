@@ -15,9 +15,7 @@
   "campaign_schedules_section",
   "campaign_schedules",
   "description_section",
-  "description",
-  "integration_tab",
-  "apollo_ref_code"
+  "description"
  ],
  "fields": [
   {
@@ -64,16 +62,6 @@
    "oldfieldname": "description",
    "oldfieldtype": "Text",
    "width": "300px"
-  },
-  {
-   "fieldname": "integration_tab",
-   "fieldtype": "Tab Break",
-   "label": "Integrations"
-  },
-  {
-   "fieldname": "apollo_ref_code",
-   "fieldtype": "Data",
-   "label": "Apollo Ref Code"
   }
  ],
  "icon": "fa fa-bullhorn",

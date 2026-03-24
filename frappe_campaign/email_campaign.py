@@ -126,6 +126,26 @@ def get(name=None, filters=None):
 	
 	if campaign.campaign_name:
 		payload["campaign_name"] = frappe.get_doc("Campaign", campaign.campaign_name).as_dict()
+		
+		# Dynamically weave Apollo Sequence Config
+		sequence = frappe.get_all(
+			"Sequence",
+			filters={"campaign": campaign.campaign_name, "sender": campaign.sender},
+			fields=["name", "emailer_campaign_id", "email_account_id"],
+			limit=1
+		)
+		if sequence:
+			payload["emailer_campaign_id"] = sequence[0].emailer_campaign_id
+			payload["email_account_id"] = sequence[0].email_account_id
+			
+			seq_steps = frappe.get_all(
+				"Sequence Step",
+				filters={"parent": sequence[0].name},
+				fields=["idx", "subject_custom_field_id", "response_custom_field_id"]
+			)
+			step_map = {str(step.idx): step for step in seq_steps}
+		else:
+			step_map = {}
 
 	# Prepare Jinja Context (kept separate from payload so n8n only gets rendered prompts)
 	context = payload.copy()
@@ -162,6 +182,12 @@ def get(name=None, filters=None):
 			
 			# Replace the string ID with the fully enriched template object
 			schedule["email_template"] = template_dict
+
+		# Dynamically weave Step IDs
+		s_idx = str(schedule.get("idx"))
+		if s_idx in step_map:
+			schedule["subject_apollo_id"] = step_map[s_idx].subject_custom_field_id
+			schedule["response_apollo_id"] = step_map[s_idx].response_custom_field_id
 
 	return payload
 
