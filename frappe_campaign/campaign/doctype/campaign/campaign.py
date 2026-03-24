@@ -46,60 +46,69 @@ class Campaign(Document):
 		mc.save(ignore_permissions=True)
 
 	def on_update(self):
-		self.update_email_campaigns()
+		frappe.enqueue(
+			"frappe_campaign.campaign.doctype.campaign.campaign.update_sequences",
+			queue="long",
+			campaign_name=self.name,
+		)
+		frappe.enqueue(
+			"frappe_campaign.campaign.doctype.campaign.campaign.update_email_campaigns",
+			queue="long",
+			campaign_name=self.name,
+		)
 
-	def update_email_campaigns(self):
-		email_campaigns = frappe.get_all("Email Campaign", filters={"campaign_name": self.name}, pluck="name")
+def update_sequences(campaign_name):
+	sequences = frappe.get_all("Sequence", filters={"campaign": campaign_name}, pluck="name")
+	for seq_name in sequences:
+		seq = frappe.get_doc("Sequence", seq_name)
+		seq.populate_sequence_steps()
+		seq.save(ignore_permissions=True)
+
+def update_email_campaigns(campaign_name):
+	campaign_doc = frappe.get_doc("Campaign", campaign_name)
+	email_campaigns = frappe.get_all("Email Campaign", filters={"campaign_name": campaign_name}, pluck="name")
+	
+	# Map existing schedules from this campaign
+	master_schedules = []
+	for row in campaign_doc.get("campaign_schedules"):
+		master_schedules.append({
+			"idx": row.idx,
+			"email_template": row.email_template,
+			"send_after_days": row.send_after_days,
+			"reference_doc": row.reference_doc,
+			"reference_docname": row.reference_docname
+		})
+
+	for ec_name in email_campaigns:
+		ec = frappe.get_doc("Email Campaign", ec_name)
 		
-		# Map existing schedules from this campaign
-		master_schedules = []
-		template_map = {}
-		for row in self.get("campaign_schedules"):
-			master_schedules.append({
-				"email_template": row.email_template,
-				"send_after_days": row.send_after_days,
-				"subject_apollo_id": row.subject_apollo_id,
-				"response_apollo_id": row.response_apollo_id,
-				"reference_doc": row.reference_doc,
-				"reference_docname": row.reference_docname
-			})
-			template_map[row.email_template] = {
-				"subject_apollo_id": row.subject_apollo_id,
-				"response_apollo_id": row.response_apollo_id
-			}
+		# Get existing email campaign schedules
+		ec_schedules = ec.get("campaign_email_schedules")
+		
+		# Clear existing list to rebuild it matched to the campaign
+		ec.set("campaign_email_schedules", [])
 
-		for ec_name in email_campaigns:
-			ec = frappe.get_doc("Email Campaign", ec_name)
-			dirty = False
+		new_rows_added = False
+
+		for m_row in master_schedules:
+			# Look for an existing row in ec_schedules with the same idx to preserve apollo IDs if present
+			existing_row = next((r for r in ec_schedules if r.idx == m_row["idx"]), None)
 			
-			# Check for apollo id updates
-			for ec_row in ec.get("campaign_email_schedules"):
-				if ec_row.email_template in template_map:
-					if not ec_row.reference_docname:
-						data = template_map[ec_row.email_template]
-						if ec_row.subject_apollo_id != data["subject_apollo_id"]:
-							ec_row.subject_apollo_id = data["subject_apollo_id"]
-							dirty = True
-						if ec_row.response_apollo_id != data["response_apollo_id"]:
-							ec_row.response_apollo_id = data["response_apollo_id"]
-							dirty = True
-							
-			# Check for new schedules added to the master campaign
-			existing_keys = {(r.email_template, r.send_after_days) for r in ec.get("campaign_email_schedules")}
-			new_rows_added = False
-			
-			for m_row in master_schedules:
-				key = (m_row["email_template"], m_row["send_after_days"])
-				if key not in existing_keys:
-					ec.append("campaign_email_schedules", m_row)
-					dirty = True
-					new_rows_added = True
-					
-			if new_rows_added and ec.status != "Draft":
-				ec.status = "Draft"
-			
-			if dirty:
-				ec.save(ignore_permissions=True)
+			if not existing_row:
+				new_rows_added = True
+
+			new_row = ec.append("campaign_email_schedules", {
+				"idx": m_row["idx"],
+				"email_template": m_row["email_template"],
+				"send_after_days": m_row["send_after_days"],
+				"reference_doc": m_row["reference_doc"],
+				"reference_docname": m_row["reference_docname"]
+			})
+
+		if new_rows_added and ec.status != "Draft":
+			ec.status = "Draft"
+		
+		ec.save(ignore_permissions=True)
 
 	def autoname(self):
 		if frappe.defaults.get_global_default("campaign_naming_by") != "Naming Series":
