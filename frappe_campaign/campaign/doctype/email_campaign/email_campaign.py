@@ -85,6 +85,7 @@ class EmailCampaign(Document):
 	def on_update(self):
 		# check if we need to generate prompts or just render
 		requires_generation = False
+		steps_to_generate = []
 		context = {}
 		if self.email_campaign_for:
 			try:
@@ -98,6 +99,7 @@ class EmailCampaign(Document):
 				
 				if getattr(template, "status", "Enabled") == "Prompt":
 					requires_generation = True
+					steps_to_generate.append(schedule.idx)
 				else:
 					# Standard Jinja Template
 					if getattr(template, "subject", None):
@@ -109,8 +111,17 @@ class EmailCampaign(Document):
 					
 		if requires_generation and self.status != "Draft":
 			self.db_set("status", "Draft", update_modified=False)
-			# The plan states: A pre-configured Webhook document in Frappe fires this bundled payload to your external LLM agent (n8n)
-			# We will just ensure the state is set so a standard webhook can catch it, or hook in `hooks.py`.
+			
+			# Offload the heavy payload creation and queuing to the Agent utility asynchronously
+			from frappe_campaign.utils.agent import queue_generation_task
+			for idx in steps_to_generate:
+				frappe.enqueue(
+					queue_generation_task,
+					queue="short",
+					campaign_name=self.name,
+					schedule_idx=idx
+				)
+				
 		elif not requires_generation and self.status == "Draft":
 			all_filled = all((s.subject and s.response) for s in self.get("campaign_email_schedules"))
 			if all_filled:
