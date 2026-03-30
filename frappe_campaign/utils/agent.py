@@ -78,11 +78,14 @@ def dispatch_integration_request(integration_request_name):
     payload_json = json.dumps(agent_payload, separators=(',', ':'))
     
     if campaign_agent_webhook_secret:
-        signature = hmac.new(
-            campaign_agent_webhook_secret.encode('utf-8'),
-            payload_json.encode('utf-8'),
-            hashlib.sha256
-        ).hexdigest()
+        import base64
+        signature = base64.b64encode(
+            hmac.new(
+                campaign_agent_webhook_secret.encode("utf8"),
+                json.dumps(agent_payload).encode("utf8"),
+                hashlib.sha256,
+            ).digest()
+        )
         headers["X-Frappe-Webhook-Signature"] = signature
     
     try:
