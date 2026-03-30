@@ -69,16 +69,19 @@ def dispatch_integration_request(integration_request_name):
     campaign_agent_api_key = frappe.conf.get("campaign_agent_api_key")
     campaign_agent_webhook_secret = frappe.conf.get("campaign_agent_webhook_secret")
     
-    if not campaign_agent_base_url or not campaign_agent_api_key:
-        frappe.log_error("Agent Base URL or API Key missing in site_config.json", "Agent Webhook Error")
+    if not campaign_agent_base_url:
+        error_msg = "Agent Base URL missing in site_config.json"
+        frappe.log_error(error_msg, "Agent Webhook Error")
         doc.db_set("status", "Failed")
-        doc.db_set("error", "Missing Agent configuration")
+        doc.db_set("error", error_msg)
         return
         
     headers = {
-        "Authorization": f"Bearer {campaign_agent_api_key}",
         "Content-Type": "application/json"
     }
+    
+    if campaign_agent_api_key:
+        headers["Authorization"] = f"Bearer {campaign_agent_api_key}"
     
     payload_json = json.dumps(agent_payload, separators=(',', ':'))
     

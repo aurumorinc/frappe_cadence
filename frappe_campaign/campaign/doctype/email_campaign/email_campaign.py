@@ -69,7 +69,8 @@ class EmailCampaign(Document):
 	def after_insert(self):
 		# 1. Frappe natively copies the campaign_schedules from the parent Campaign into the local campaign_email_schedules child table.
 		campaign = frappe.get_doc("Campaign", self.campaign_name)
-		for entry in campaign.get("campaign_schedules"):
+		campaign_schedules = campaign.get("campaign_schedules") or []
+		for entry in campaign_schedules:
 			self.append("campaign_email_schedules", {
 				"email_template": entry.email_template,
 				"send_after_days": entry.send_after_days,
@@ -121,6 +122,17 @@ class EmailCampaign(Document):
 					campaign_name=self.name,
 					schedule_idx=idx
 				)
+		elif requires_generation and self.status == "Draft":
+			# Still offload if it's already in draft and generation is still required
+			# Offload the heavy payload creation and queuing to the Agent utility asynchronously
+			from frappe_campaign.utils.agent import queue_generation_task
+			for idx in steps_to_generate:
+				frappe.enqueue(
+					queue_generation_task,
+					queue="short",
+					campaign_name=self.name,
+					schedule_idx=idx
+				)
 				
 		elif not requires_generation and self.status == "Draft":
 			all_filled = all((s.subject and s.response) for s in self.get("campaign_email_schedules"))
@@ -138,6 +150,12 @@ def unsubscribe_recipient(unsubscribe, method):
 			"status": "Unsubscribed",
 			"end_date": today()
 		})
+
+def mark_campaign_completed(email_campaign_name):
+	frappe.db.set_value("Email Campaign", email_campaign_name, {
+		"status": "Completed",
+		"end_date": today()
+	})
 
 def requeue_timed_out_generations():
 	# Sweeper Job to re-queue campaigns stuck in Generating state (status = '') for more than 60 minutes
