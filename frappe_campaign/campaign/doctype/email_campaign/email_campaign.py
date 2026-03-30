@@ -101,6 +101,7 @@ class EmailCampaign(Document):
 				if getattr(template, "status", "Enabled") == "Prompt":
 					requires_generation = True
 					steps_to_generate.append(schedule.idx)
+					break # Only queue the first missing step to ensure sequential generation
 				else:
 					# Standard Jinja Template
 					if getattr(template, "subject", None):
