@@ -82,7 +82,7 @@ def dispatch_integration_request(integration_request_name):
         signature = base64.b64encode(
             hmac.new(
                 campaign_agent_webhook_secret.encode("utf8"),
-                json.dumps(agent_payload).encode("utf8"),
+                payload_json.encode("utf8"),
                 hashlib.sha256,
             ).digest()
         )
