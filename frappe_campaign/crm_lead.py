@@ -2,7 +2,7 @@ import frappe
 import json
 
 @frappe.whitelist()
-def get(filters=None, fields=None):
+def get(filters=None, fields=None, limit=None):
     if isinstance(filters, str):
         filters = json.loads(filters)
     if isinstance(fields, str):
@@ -12,6 +12,13 @@ def get(filters=None, fields=None):
         filters = []
     if not fields:
         fields = ["name"]
+        
+    limit_kwargs = {}
+    if limit is not None:
+        try:
+            limit_kwargs["limit_page_length"] = int(limit)
+        except ValueError:
+            pass
         
     standard_filters = []
     excluded_campaigns = []
@@ -45,7 +52,7 @@ def get(filters=None, fields=None):
         added_name_field = True
             
     # Fetch leads using standard Frappe logic
-    leads = frappe.get_all("CRM Lead", filters=standard_filters, fields=fields)
+    leads = frappe.get_all("CRM Lead", filters=standard_filters, fields=fields, **limit_kwargs)
     
     # Apply custom exclusion logic
     if excluded_campaigns:
