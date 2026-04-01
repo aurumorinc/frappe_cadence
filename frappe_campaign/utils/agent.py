@@ -10,6 +10,45 @@ def queue_generation_task(campaign_name, schedule_idx):
     """
     Constructs the rich payload, generates the callbacks, and creates the Integration Request.
     """
+    from frappe.utils import add_to_date, now_datetime, get_datetime
+    
+    request_desc = f"Generate Prompt for {campaign_name} - Step {schedule_idx}"
+    
+    # Check for existing requests to deduplicate
+    existing_requests = frappe.get_all(
+        "Integration Request",
+        filters={
+            "reference_doctype": "Email Campaign",
+            "reference_docname": campaign_name,
+            "request_description": request_desc,
+            "status": ("in", ["Queued", "Authorized"])
+        },
+        fields=["name", "status", "modified"],
+        order_by="creation desc",
+        limit=1
+    )
+    
+    if existing_requests:
+        req = existing_requests[0]
+        if req.status == "Queued":
+            # Already queued, wait for it to be processed
+            frappe.logger("agent").info(f"Skipping generation task for {campaign_name} - Step {schedule_idx} as it is already Queued ({req.name}).")
+            return
+        elif req.status == "Authorized":
+            # Check if it has timed out (360 minutes)
+            timeout_threshold = add_to_date(now_datetime(), minutes=-360)
+            if get_datetime(req.modified) > get_datetime(timeout_threshold):
+                # Still valid, skip creating a new one
+                frappe.logger("agent").info(f"Skipping generation task for {campaign_name} - Step {schedule_idx} as it is Authorized and valid ({req.name}).")
+                return
+            else:
+                # Timed out, mark as Failed and proceed to create a new one
+                frappe.db.set_value("Integration Request", req.name, {
+                    "status": "Failed",
+                    "error": "Timed out waiting for Agent response (360 minutes)."
+                })
+                frappe.logger("agent").warning(f"Marked Integration Request {req.name} as Failed due to 360-minute timeout. Creating a new one.")
+
     filters = [["Campaign Email Schedule", "idx", "=", schedule_idx]]
     fields = ["*"]
     

@@ -149,13 +149,13 @@ doc_events = {
 # Scheduled Tasks
 # ---------------
 
-scheduler_events = {
-	"cron": {
-		"*/65 * * * *": [
-			"frappe_campaign.campaign.doctype.email_campaign.email_campaign.requeue_timed_out_generations"
-		]
-	}
-}
+# scheduler_events = {
+# 	"cron": {
+# 		"*/65 * * * *": [
+# 			"frappe_campaign.campaign.doctype.email_campaign.email_campaign.requeue_timed_out_generations"
+# 		]
+# 	}
+# }
 
 
 # Testing
