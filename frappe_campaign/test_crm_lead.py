@@ -81,3 +81,10 @@ class TestCRMLead(IntegrationTestCase):
         lead_names = [l.name for l in leads]
         self.assertNotIn(self.lead1.name, lead_names)
         self.assertIn(self.lead2.name, lead_names)
+
+    def test_get_leads_with_limit(self):
+        # We have lead1 and lead2 with Cold Email source
+        filters = '[["CRM Lead", "source", "=", "Cold Email"]]'
+        leads = get_crm_leads(filters=filters, fields='["name"]', limit=1)
+        
+        self.assertEqual(len(leads), 1)

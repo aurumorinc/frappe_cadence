@@ -16,7 +16,7 @@ def get(filters=None, fields=None, limit=None):
     limit_kwargs = {}
     if limit is not None:
         try:
-            limit_kwargs["limit_page_length"] = int(limit)
+            limit_kwargs["limit"] = int(limit)
         except ValueError:
             pass
         
@@ -45,16 +45,6 @@ def get(filters=None, fields=None, limit=None):
                     continue
             standard_filters.append(f)
             
-    # We need "name" in fields to filter excluded_campaigns
-    added_name_field = False
-    if excluded_campaigns and "name" not in fields and "*" not in fields:
-        fields.append("name")
-        added_name_field = True
-            
-    # Fetch leads using standard Frappe logic
-    leads = frappe.get_all("CRM Lead", filters=standard_filters, fields=fields, **limit_kwargs)
-    
-    # Apply custom exclusion logic
     if excluded_campaigns:
         campaign_leads = frappe.get_all(
             "CRM Lead Campaign", 
@@ -62,11 +52,9 @@ def get(filters=None, fields=None, limit=None):
             pluck="parent"
         )
         if campaign_leads:
-            leads = [lead for lead in leads if lead.get("name") not in campaign_leads]
+            standard_filters.append(["name", "not in", campaign_leads])
             
-        # Clean up the "name" field if we added it just for filtering
-        if added_name_field:
-            for lead in leads:
-                lead.pop("name", None)
+    # Fetch leads using standard Frappe logic
+    leads = frappe.get_all("CRM Lead", filters=standard_filters, fields=fields, **limit_kwargs)
             
     return leads
