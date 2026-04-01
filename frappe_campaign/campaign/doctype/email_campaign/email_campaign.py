@@ -157,25 +157,3 @@ def mark_campaign_completed(email_campaign_name):
 		"status": "Completed",
 		"end_date": today()
 	})
-
-def requeue_timed_out_generations():
-	# Sweeper Job to re-queue campaigns stuck in Generating state (status = '') for more than 60 minutes
-	# Allowing Convoy enough time (10 retries, ~50 mins) to finish before we assume the message is dead.
-	from frappe.utils import add_to_date, now_datetime
-
-	threshold = add_to_date(now_datetime(), minutes=-60)
-
-	# Fetch Email Campaigns that require generation but haven't been updated in 60 mins
-	timed_out_campaigns = frappe.get_all(
-		"Email Campaign",
-		filters={
-			"status": "Draft",
-			"modified": ["<", threshold]
-		},
-		pluck="name"
-	)
-
-	for campaign_name in timed_out_campaigns:
-		doc = frappe.get_doc("Email Campaign", campaign_name)
-		# A simple save will trigger the on_update hooks, which will fire the Generation Webhook again
-		doc.save(ignore_permissions=True)
