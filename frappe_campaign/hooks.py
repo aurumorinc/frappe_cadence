@@ -155,6 +155,16 @@ scheduler_events = {
 	]
 }
 
+# Controller Events
+# -----------------
+
+controller_events = {
+	"frappe_campaign.campaign.agent.process_campaign_step": {
+		"rate_limit_per_minute": 50,
+		"retries": 3,
+		"timeout": 300
+	}
+}
 
 # Testing
 # -------
