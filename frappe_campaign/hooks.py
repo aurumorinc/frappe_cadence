@@ -152,12 +152,7 @@ doc_events = {
 scheduler_events = {
 	"daily": [
 		"frappe_campaign.utils.enrichment.check_and_mark_stale_enrichments"
-	],
-	"cron": {
-		"*/65 * * * *": [
-			"frappe_campaign.campaign.doctype.email_campaign.email_campaign.requeue_timed_out_generations"
-		]
-	}
+	]
 }
 
 
