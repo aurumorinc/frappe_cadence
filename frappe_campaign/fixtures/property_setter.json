@@ -8,5 +8,25 @@
   "property": "options",
   "property_type": "Text",
   "value": "\nEmail\nChat\nPhone\nSMS\nEvent\nMeeting\nVisit\nOther\nLinkedIn\nWhatsApp"
+ },
+ {
+  "doc_type": "Communication",
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "subject",
+  "name": "Communication-subject-reqd",
+  "property": "reqd",
+  "property_type": "Check",
+  "value": "0"
+ },
+ {
+  "doc_type": "Communication",
+  "doctype": "Property Setter",
+  "doctype_or_field": "DocField",
+  "field_name": "subject",
+  "name": "Communication-subject-mandatory_depends_on",
+  "property": "mandatory_depends_on",
+  "property_type": "Data",
+  "value": "eval:doc.communication_medium == 'Email'"
  }
 ]
