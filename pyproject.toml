@@ -1,5 +1,5 @@
 [project]
-name = "frappe_campaign"
+name = "frappe_cadence"
 authors = [
     { name = "Aryan Singh", email = "aquiveal@gmail.com"}
 ]
@@ -21,7 +21,7 @@ build-backend = "flit_core.buildapi"
 
 [tool.ruff]
 line-length = 110
-target-version = "py314"
+target-version = "16.0.0"
 
 [tool.ruff.lint]
 select = [
