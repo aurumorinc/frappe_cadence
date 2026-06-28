@@ -1,7 +1,7 @@
 import frappe
 import json
 from frappe.tests import IntegrationTestCase
-from frappe_campaign.crm_organization import get as get_crm_organizations
+from frappe_cadence.crm_organization import get as get_crm_organizations
 
 class TestCRMOrganization(IntegrationTestCase):
     @classmethod
@@ -26,10 +26,10 @@ class TestCRMOrganization(IntegrationTestCase):
             "website_status": "TestInactive"
         }).insert(ignore_permissions=True, ignore_mandatory=True, ignore_links=True)
         
-        # 2. Create Campaign
-        cls.campaign1 = frappe.get_doc({
-            "doctype": "Campaign",
-            "campaign_name": "_Test Campaign 1"
+        # 2. Create Cadence
+        cls.cadence1 = frappe.get_doc({
+            "doctype": "Cadence",
+            "cadence_name": "_Test Cadence 1"
         }).insert(ignore_permissions=True, ignore_mandatory=True, ignore_links=True)
         
         # 3. Create Leads
@@ -57,13 +57,13 @@ class TestCRMOrganization(IntegrationTestCase):
             "organization": cls.org2.name
         }).insert(ignore_permissions=True, ignore_mandatory=True, ignore_links=True)
         
-        # 4. Link Lead 1 to Campaign 1
+        # 4. Link Lead 1 to Cadence 1
         frappe.get_doc({
-            "doctype": "CRM Lead Campaign",
+            "doctype": "CRM Lead Cadence",
             "parent": cls.lead1.name,
             "parenttype": "CRM Lead",
-            "parentfield": "campaigns",
-            "campaign_name": cls.campaign1.name
+            "parentfield": "cadences",
+            "cadence_name": cls.cadence1.name
         }).insert(ignore_permissions=True, ignore_mandatory=True, ignore_links=True)
 
     @classmethod
@@ -82,8 +82,8 @@ class TestCRMOrganization(IntegrationTestCase):
         self.assertIn(self.org1.name, org_names)
         self.assertIn(self.org2.name, org_names)
 
-    def test_get_organizations_with_campaign_exclusion(self):
-        filters = f'[["CRM Lead Campaign", "name", "not in", ["{self.campaign1.name}"]], ["CRM Lead", "source", "=", "Cold Email"]]'
+    def test_get_organizations_with_cadence_exclusion(self):
+        filters = f'[["CRM Lead Cadence", "name", "not in", ["{self.cadence1.name}"]], ["CRM Lead", "source", "=", "Cold Email"]]'
         fields = '["name", "organization_name"]'
         
         orgs = get_crm_organizations(filters=filters, fields=fields)

@@ -3,7 +3,7 @@ from frappe.tests import IntegrationTestCase
 from unittest.mock import patch, call
 import json
 
-class TestMultiChannelCampaign(IntegrationTestCase):
+class TestMultiChannelCadence(IntegrationTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
@@ -22,7 +22,7 @@ class TestMultiChannelCampaign(IntegrationTestCase):
             })
             doc.insert(ignore_permissions=True)
             
-        if not frappe.db.exists("Controller Job Type", "frappe_campaign.campaign.agent.process_campaign_step"):
+        if not frappe.db.exists("Controller Job Type", "frappe_cadence.cadence.agent.process_cadence_step"):
             if not frappe.db.exists("DocType", "Controller Job Type"):
                 doc = frappe.get_doc({
                     "doctype": "DocType",
@@ -37,8 +37,8 @@ class TestMultiChannelCampaign(IntegrationTestCase):
             
             frappe.get_doc({
                 "doctype": "Controller Job Type",
-                "name": "frappe_campaign.campaign.agent.process_campaign_step",
-                "method": "frappe_campaign.campaign.agent.process_campaign_step"
+                "name": "frappe_cadence.cadence.agent.process_cadence_step",
+                "method": "frappe_cadence.cadence.agent.process_cadence_step"
             }).insert(ignore_permissions=True)
             
         # Create templates
@@ -73,6 +73,53 @@ class TestMultiChannelCampaign(IntegrationTestCase):
         else:
             cls.lead_name = lead[0].name
 
+<<<<<<< ours:frappe_cadence/tests/integration/cadence/doctype/multi_channel_cadence/test_multi_channel_cadence.py
+        # Create a master Cadence
+        if not frappe.db.exists("Cadence", "_Test Master Cadence"):
+            cls.master_cadence = frappe.get_doc({
+                "doctype": "Cadence",
+                "cadence_name": "_Test Master Cadence",
+                "cadence_schedules": [
+                    {"reference_doctype": "Email Template", "reference_name": "Test Email Template", "send_after_days": 1},
+                    {"reference_doctype": "LinkedIn Template", "reference_name": "Test LinkedIn Template", "send_after_days": 2},
+                    {"reference_doctype": "SMS Template", "reference_name": "Test SMS Template", "send_after_days": 3}
+                ]
+            }).insert(ignore_permissions=True)
+        else:
+            cls.master_cadence = frappe.get_doc("Cadence", "_Test Master Cadence")
+
+    @classmethod
+    def tearDownClass(cls):
+        frappe.db.rollback()
+        super().tearDownClass()
+
+    def setUp(self):
+        # Create a dummy cadence
+        self.cadence = frappe.get_doc({
+            "doctype": "Multi Channel Cadence",
+            "cadence_name": self.master_cadence.name,
+            "cadence_for": "CRM Lead",
+||||||| ancestor
+    def setUp(self):
+        frappe.db.rollback()
+        
+        # Create a master Campaign
+        self.master_campaign = frappe.get_doc({
+            "doctype": "Campaign",
+            "campaign_name": "_Test Master Campaign",
+            "campaign_schedules": [
+                {"reference_doctype": "Email Template", "reference_name": "Test Email Template", "send_after_days": 1},
+                {"reference_doctype": "LinkedIn Template", "reference_name": "Test LinkedIn Template", "send_after_days": 2},
+                {"reference_doctype": "SMS Template", "reference_name": "Test SMS Template", "send_after_days": 3}
+            ]
+        }).insert(ignore_permissions=True)
+        
+        # Create a dummy campaign
+        self.campaign = frappe.get_doc({
+            "doctype": "Multi Channel Campaign",
+            "campaign_name": self.master_campaign.name,
+            "campaign_for": "CRM Lead",
+=======
         # Create a master Campaign
         if not frappe.db.exists("Campaign", "_Test Master Campaign"):
             cls.master_campaign = frappe.get_doc({
@@ -98,60 +145,71 @@ class TestMultiChannelCampaign(IntegrationTestCase):
             "doctype": "Multi Channel Campaign",
             "campaign_name": self.master_campaign.name,
             "campaign_for": "CRM Lead",
+>>>>>>> theirs:frappe_campaign/campaign/doctype/multi_channel_campaign/test_multi_channel_campaign.py
             "recipient": self.lead_name,
             "start_date": "2024-01-01",
             "status": "Scheduled"
         })
 
+<<<<<<< ours:frappe_cadence/tests/integration/cadence/doctype/multi_channel_cadence/test_multi_channel_cadence.py
+    def tearDown(self):
+        if self.cadence.name:
+            frappe.delete_doc("Multi Channel Cadence", self.cadence.name, ignore_permissions=True, force=True)
+
+    @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.enqueue")
+||||||| ancestor
+    @patch("frappe_campaign.campaign.doctype.multi_channel_campaign.multi_channel_campaign.enqueue")
+=======
     def tearDown(self):
         if self.campaign.name:
             frappe.delete_doc("Multi Channel Campaign", self.campaign.name, ignore_permissions=True, force=True)
 
     @patch("frappe_campaign.campaign.doctype.multi_channel_campaign.multi_channel_campaign.enqueue")
+>>>>>>> theirs:frappe_campaign/campaign/doctype/multi_channel_campaign/test_multi_channel_campaign.py
     def test_on_update_cancels_existing_jobs(self, mock_enqueue):
-        self.campaign.insert(ignore_permissions=True)
+        self.cadence.insert(ignore_permissions=True)
         mock_enqueue.reset_mock()
         
         # Create dummy FS Jobs
         job1 = frappe.get_doc({
             "doctype": "FS Job",
             "status": "queued",
-            "job_type": "frappe_campaign.campaign.agent.process_campaign_step",
-            "arguments": json.dumps({"campaign_name": self.campaign.name})
+            "job_type": "frappe_cadence.cadence.agent.process_cadence_step",
+            "arguments": json.dumps({"cadence_name": self.cadence.name})
         }).insert(ignore_permissions=True)
         
         job2 = frappe.get_doc({
             "doctype": "FS Job",
             "status": "started",
-            "job_type": "frappe_campaign.campaign.agent.process_campaign_step",
-            "arguments": json.dumps({"campaign_name": self.campaign.name})
+            "job_type": "frappe_cadence.cadence.agent.process_cadence_step",
+            "arguments": json.dumps({"cadence_name": self.cadence.name})
         }).insert(ignore_permissions=True)
         
         # Trigger on_update
-        self.campaign.on_update()
+        self.cadence.on_update()
         
         # Assert jobs are cancelled
         self.assertEqual(frappe.db.get_value("FS Job", job1.name, "status"), "canceled")
         self.assertEqual(frappe.db.get_value("FS Job", job2.name, "status"), "canceled")
 
-    @patch("frappe_campaign.campaign.doctype.multi_channel_campaign.multi_channel_campaign.enqueue")
+    @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.enqueue")
     def test_on_update_enqueues_all_steps_initially(self, mock_enqueue):
-        self.campaign.insert(ignore_permissions=True)
+        self.cadence.insert(ignore_permissions=True)
         mock_enqueue.reset_mock()
-        self.campaign.on_update()
+        self.cadence.on_update()
         
         self.assertEqual(mock_enqueue.call_count, 3)
         
         calls = [
-            call("frappe_campaign.campaign.agent.process_campaign_step", queue="default", campaign_name=self.campaign.name, schedule_name=self.master_campaign.campaign_schedules[0].name, previous_schedule_name=None),
-            call("frappe_campaign.campaign.agent.process_campaign_step", queue="default", campaign_name=self.campaign.name, schedule_name=self.master_campaign.campaign_schedules[1].name, previous_schedule_name=self.master_campaign.campaign_schedules[0].name),
-            call("frappe_campaign.campaign.agent.process_campaign_step", queue="default", campaign_name=self.campaign.name, schedule_name=self.master_campaign.campaign_schedules[2].name, previous_schedule_name=self.master_campaign.campaign_schedules[1].name)
+            call("frappe_cadence.cadence.agent.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[0].name, previous_schedule_name=None),
+            call("frappe_cadence.cadence.agent.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[1].name, previous_schedule_name=self.master_cadence.cadence_schedules[0].name),
+            call("frappe_cadence.cadence.agent.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[2].name, previous_schedule_name=self.master_cadence.cadence_schedules[1].name)
         ]
         mock_enqueue.assert_has_calls(calls)
 
-    @patch("frappe_campaign.campaign.doctype.multi_channel_campaign.multi_channel_campaign.enqueue")
+    @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.enqueue")
     def test_on_update_skips_sent_communications(self, mock_enqueue):
-        self.campaign.insert(ignore_permissions=True)
+        self.cadence.insert(ignore_permissions=True)
         mock_enqueue.reset_mock()
         
         # Create a Sent Communication for schedule 1
@@ -159,26 +217,26 @@ class TestMultiChannelCampaign(IntegrationTestCase):
             "doctype": "Communication",
             "communication_medium": "Email",
             "subject": "Test",
-            "reference_doctype": "Multi Channel Campaign",
-            "reference_name": self.campaign.name,
-            "campaign_schedule": self.master_campaign.campaign_schedules[0].name,
+            "reference_doctype": "Multi Channel Cadence",
+            "reference_name": self.cadence.name,
+            "cadence_schedule": self.master_cadence.cadence_schedules[0].name,
             "delivery_status": "Sent"
         }).insert(ignore_permissions=True)
         
-        self.campaign.on_update()
+        self.cadence.on_update()
         
         # Should only enqueue for schedule 2 and 3
         self.assertEqual(mock_enqueue.call_count, 2)
         
         calls = [
-            call("frappe_campaign.campaign.agent.process_campaign_step", queue="default", campaign_name=self.campaign.name, schedule_name=self.master_campaign.campaign_schedules[1].name, previous_schedule_name=self.master_campaign.campaign_schedules[0].name),
-            call("frappe_campaign.campaign.agent.process_campaign_step", queue="default", campaign_name=self.campaign.name, schedule_name=self.master_campaign.campaign_schedules[2].name, previous_schedule_name=self.master_campaign.campaign_schedules[1].name)
+            call("frappe_cadence.cadence.agent.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[1].name, previous_schedule_name=self.master_cadence.cadence_schedules[0].name),
+            call("frappe_cadence.cadence.agent.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[2].name, previous_schedule_name=self.master_cadence.cadence_schedules[1].name)
         ]
         mock_enqueue.assert_has_calls(calls)
 
-    @patch("frappe_campaign.campaign.doctype.multi_channel_campaign.multi_channel_campaign.enqueue")
+    @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.enqueue")
     def test_on_update_deletes_unsent_communications_and_requeues(self, mock_enqueue):
-        self.campaign.insert(ignore_permissions=True)
+        self.cadence.insert(ignore_permissions=True)
         mock_enqueue.reset_mock()
         
         # Create a Scheduled Communication for schedule 1
@@ -186,13 +244,13 @@ class TestMultiChannelCampaign(IntegrationTestCase):
             "doctype": "Communication",
             "communication_medium": "Email",
             "subject": "Test",
-            "reference_doctype": "Multi Channel Campaign",
-            "reference_name": self.campaign.name,
-            "campaign_schedule": self.master_campaign.campaign_schedules[0].name,
+            "reference_doctype": "Multi Channel Cadence",
+            "reference_name": self.cadence.name,
+            "cadence_schedule": self.master_cadence.cadence_schedules[0].name,
             "delivery_status": "Scheduled"
         }).insert(ignore_permissions=True)
         
-        self.campaign.on_update()
+        self.cadence.on_update()
         
         # Assert Communication is deleted
         self.assertFalse(frappe.db.exists("Communication", comm.name))

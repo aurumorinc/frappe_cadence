@@ -1,9 +1,9 @@
 import frappe
-from frappe.tests.utils import FrappeTestCase
-from frappe_campaign.utils.enrichment import check_and_mark_stale_enrichments
+from frappe.tests import IntegrationTestCase
+from frappe_cadence.utils.enrichment import check_and_mark_stale_enrichments
 from frappe.utils import add_months, nowdate
 
-class TestEnrichmentUtils(FrappeTestCase):
+class TestEnrichmentUtils(IntegrationTestCase):
     def setUp(self):
         # 1. Ensure master data exists
         for status in ["Pending", "Enriched", "Partial", "Stale", "Failed"]:
