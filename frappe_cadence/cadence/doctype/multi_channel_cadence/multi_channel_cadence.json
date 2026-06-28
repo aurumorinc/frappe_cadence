@@ -6,8 +6,8 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "campaign_name",
-  "campaign_for",
+  "cadence_name",
+  "cadence_for",
   "recipient",
   "sender",
   "column_break_4",
@@ -17,11 +17,11 @@
  ],
  "fields": [
   {
-   "fieldname": "campaign_name",
+   "fieldname": "cadence_name",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Campaign",
-   "options": "Campaign",
+   "label": "Cadence",
+   "options": "Cadence",
    "reqd": 1
   },
   {
@@ -49,10 +49,10 @@
   },
   {
    "default": "CRM Lead",
-   "fieldname": "campaign_for",
+   "fieldname": "cadence_for",
    "fieldtype": "Select",
    "in_list_view": 1,
-   "label": "Campaign For",
+   "label": "Cadence For",
    "options": "\nCRM Lead\nContact\nEmail Group",
    "reqd": 1
   },
@@ -60,7 +60,7 @@
    "fieldname": "recipient",
    "fieldtype": "Dynamic Link",
    "label": "Recipient",
-   "options": "campaign_for",
+   "options": "cadence_for",
    "reqd": 1
   },
   {
@@ -74,8 +74,8 @@
  "links": [],
  "modified": "2024-03-27 13:09:36.177528",
  "modified_by": "Administrator",
- "module": "Campaign",
- "name": "Multi Channel Campaign",
+ "module": "Cadence",
+ "name": "Multi Channel Cadence",
  "owner": "Administrator",
  "permissions": [
   {
