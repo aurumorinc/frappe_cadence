@@ -1,6 +1,6 @@
 import frappe
 from frappe.tests import IntegrationTestCase
-from frappe_campaign.crm_lead import get as get_crm_leads
+from frappe_cadence.crm_lead import get as get_crm_leads
 
 class TestCRMLead(IntegrationTestCase):
     @classmethod
@@ -18,10 +18,10 @@ class TestCRMLead(IntegrationTestCase):
             "organization_name": "_Test Org 2"
         }).insert(ignore_permissions=True, ignore_mandatory=True, ignore_links=True)
         
-        # 2. Create Campaign
-        cls.campaign1 = frappe.get_doc({
-            "doctype": "Campaign",
-            "campaign_name": "_Test Campaign 1"
+        # 2. Create Cadence
+        cls.cadence1 = frappe.get_doc({
+            "doctype": "Cadence",
+            "cadence_name": "_Test Cadence 1"
         }).insert(ignore_permissions=True, ignore_mandatory=True, ignore_links=True)
         
         # 3. Create Leads
@@ -49,13 +49,13 @@ class TestCRMLead(IntegrationTestCase):
             "organization": cls.org2.name
         }).insert(ignore_permissions=True, ignore_mandatory=True, ignore_links=True)
         
-        # 4. Link Lead 1 to Campaign 1
+        # 4. Link Lead 1 to Cadence 1
         frappe.get_doc({
-            "doctype": "CRM Lead Campaign",
+            "doctype": "CRM Lead Cadence",
             "parent": cls.lead1.name,
             "parenttype": "CRM Lead",
-            "parentfield": "campaigns",
-            "campaign_name": cls.campaign1.name
+            "parentfield": "cadences",
+            "cadence_name": cls.cadence1.name
         }).insert(ignore_permissions=True, ignore_mandatory=True, ignore_links=True)
 
     @classmethod
@@ -63,7 +63,7 @@ class TestCRMLead(IntegrationTestCase):
         frappe.db.rollback()
         super().tearDownClass()
 
-    def test_get_leads_without_campaign_exclusion(self):
+    def test_get_leads_without_cadence_exclusion(self):
         filters = '[["CRM Lead", "source", "=", "Cold Email"]]'
         leads = get_crm_leads(filters=filters, fields='["name", "organization"]')
         
@@ -72,12 +72,12 @@ class TestCRMLead(IntegrationTestCase):
         self.assertIn(self.lead2.name, lead_names)
         self.assertNotIn(self.lead3.name, lead_names)
 
-    def test_get_leads_with_campaign_exclusion(self):
+    def test_get_leads_with_cadence_exclusion(self):
         # We simulate the exact n8n filter
-        filters = f'[["CRM Lead Campaign", "name", "not in", ["{self.campaign1.name}"]], ["CRM Lead", "source", "=", "Cold Email"]]'
+        filters = f'[["CRM Lead Cadence", "name", "not in", ["{self.cadence1.name}"]], ["CRM Lead", "source", "=", "Cold Email"]]'
         leads = get_crm_leads(filters=filters, fields='["name", "organization"]')
         
-        # lead1 should be excluded because it's in _Test Campaign 1
+        # lead1 should be excluded because it's in _Test Cadence 1
         lead_names = [l.name for l in leads]
         self.assertNotIn(self.lead1.name, lead_names)
         self.assertIn(self.lead2.name, lead_names)
