@@ -7,39 +7,39 @@ import hashlib
 import base64
 from frappe_controller.utils.controller import wait_for_event, emit_event
 
-def process_campaign_step(campaign_name, schedule_name, previous_schedule_name=None):
+def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=None):
     """
-    Processes a single step in a multi-channel campaign.
+    Processes a single step in a multi-channel cadence.
     Must be idempotent as it executes from line 1 when resumed.
     """
     # 1. Wait for Previous Step
     if previous_schedule_name:
         prev_comm = frappe.get_all("Communication", filters={
-            "reference_doctype": "Multi Channel Campaign",
-            "reference_name": campaign_name,
-            "campaign_schedule": previous_schedule_name,
+            "reference_doctype": "Multi Channel Cadence",
+            "reference_name": cadence_name,
+            "cadence_schedule": previous_schedule_name,
             "delivery_status": ["in", ["Scheduled", "Sent"]]
         })
         if not prev_comm:
             wait_for_event(
-                "campaign_step_completed",
-                condition=f"argument.get('campaign_name') == '{campaign_name}' and argument.get('schedule_name') == '{previous_schedule_name}'"
+                "cadence_step_completed",
+                condition=f"argument.get('cadence_name') == '{cadence_name}' and argument.get('schedule_name') == '{previous_schedule_name}'"
             )
             return
 
     # 2. Idempotency Check
     curr_comm = frappe.get_all("Communication", filters={
-        "reference_doctype": "Multi Channel Campaign",
-        "reference_name": campaign_name,
-        "campaign_schedule": schedule_name,
+        "reference_doctype": "Multi Channel Cadence",
+        "reference_name": cadence_name,
+        "cadence_schedule": schedule_name,
         "delivery_status": ["in", ["Scheduled", "Sent"]]
     })
     if curr_comm:
-        emit_event("campaign_step_completed", {"campaign_name": campaign_name, "schedule_name": schedule_name})
+        emit_event("cadence_step_completed", {"cadence_name": cadence_name, "schedule_name": schedule_name})
         return
 
     # 3. Process Template
-    schedule = frappe.get_doc("Campaign Multi Channel Schedule", schedule_name)
+    schedule = frappe.get_doc("Cadence Multi Channel Schedule", schedule_name)
     
     template_doctype = f"{schedule.reference_doctype}"
     template_name = schedule.reference_name
@@ -53,21 +53,21 @@ def process_campaign_step(campaign_name, schedule_name, previous_schedule_name=N
             "communication_medium": channel,
             "subject": getattr(template, "subject", template.get("title", f"{channel} Message")),
             "content": template.get("message") or template.get("response"),
-            "reference_doctype": "Multi Channel Campaign",
-            "reference_name": campaign_name,
-            "campaign_schedule": schedule_name,
+            "reference_doctype": "Multi Channel Cadence",
+            "reference_name": cadence_name,
+            "cadence_schedule": schedule_name,
             "status": "Open",
             "delivery_status": "Scheduled"
         })
         comm.insert(ignore_permissions=True)
-        emit_event("campaign_step_completed", {"campaign_name": campaign_name, "schedule_name": schedule_name})
+        emit_event("cadence_step_completed", {"cadence_name": cadence_name, "schedule_name": schedule_name})
         return
 
     if template.status == "Prompt":
         draft_comm = frappe.get_all("Communication", filters={
-            "reference_doctype": "Multi Channel Campaign",
-            "reference_name": campaign_name,
-            "campaign_schedule": schedule_name,
+            "reference_doctype": "Multi Channel Cadence",
+            "reference_name": cadence_name,
+            "cadence_schedule": schedule_name,
             "status": "Open"
         })
         
@@ -76,17 +76,17 @@ def process_campaign_step(campaign_name, schedule_name, previous_schedule_name=N
                 "doctype": "Communication",
                 "communication_medium": channel,
                 "subject": f"Draft {channel} Message",
-                "reference_doctype": "Multi Channel Campaign",
-                "reference_name": campaign_name,
-                "campaign_schedule": schedule_name,
+                "reference_doctype": "Multi Channel Cadence",
+                "reference_name": cadence_name,
+                "cadence_schedule": schedule_name,
                 "status": "Open"
             })
             comm.insert(ignore_permissions=True)
             comm_name = comm.name
             
             # Construct AI Agent payload
-            campaign = frappe.get_doc("Multi Channel Campaign", campaign_name)
-            lead = frappe.get_doc(campaign.campaign_for, campaign.recipient)
+            cadence = frappe.get_doc("Multi Channel Cadence", cadence_name)
+            lead = frappe.get_doc(cadence.cadence_for, cadence.recipient)
             
             # Fetch History records
             from frappe.utils import add_months, today, get_url
@@ -95,13 +95,13 @@ def process_campaign_step(campaign_name, schedule_name, previous_schedule_name=N
             # Get history for lead
             history_filters = [
                 ["creation", ">=", three_months_ago],
-                ["reference_doctype", "=", campaign.campaign_for],
+                ["reference_doctype", "=", cadence.cadence_for],
                 ["reference_name", "=", lead.name]
             ]
             histories = frappe.get_all("History", filters=history_filters, fields=["*"])
             
             # Get history for organization if it's a CRM Lead
-            if campaign.campaign_for == "CRM Lead" and lead.organization:
+            if cadence.cadence_for == "CRM Lead" and lead.organization:
                 org_histories = frappe.get_all("History", filters=[
                     ["creation", ">=", three_months_ago],
                     ["reference_doctype", "=", "CRM Organization"],
@@ -162,25 +162,25 @@ def process_campaign_step(campaign_name, schedule_name, previous_schedule_name=N
                         "image_url": get_url(history.image)
                     })
             
-            cache_val = frappe.cache().get_value(f"ai_req:{campaign_name}:{schedule_name}")
+            cache_val = frappe.cache().get_value(f"ai_req:{cadence_name}:{schedule_name}")
             
             if not cache_val:
                 # Send POST request to AI Agent webhook
-                campaign_agent_base_url = frappe.conf.get("campaign_agent_base_url")
-                campaign_agent_api_key = frappe.conf.get("campaign_agent_api_key")
-                campaign_agent_webhook_secret = frappe.conf.get("campaign_agent_webhook_secret")
+                cadence_agent_base_url = frappe.conf.get("cadence_agent_base_url")
+                cadence_agent_api_key = frappe.conf.get("cadence_agent_api_key")
+                cadence_agent_webhook_secret = frappe.conf.get("cadence_agent_webhook_secret")
                 
-                if campaign_agent_base_url:
+                if cadence_agent_base_url:
                     headers = {"Content-Type": "application/json"}
-                    if campaign_agent_api_key:
-                        headers["Authorization"] = f"Bearer {campaign_agent_api_key}"
+                    if cadence_agent_api_key:
+                        headers["Authorization"] = f"Bearer {cadence_agent_api_key}"
                     
                     payload_json = json.dumps(payload, separators=(',', ':'))
                     
-                    if campaign_agent_webhook_secret:
+                    if cadence_agent_webhook_secret:
                         signature = base64.b64encode(
                             hmac.new(
-                                campaign_agent_webhook_secret.encode("utf8"),
+                                cadence_agent_webhook_secret.encode("utf8"),
                                 payload_json.encode("utf8"),
                                 hashlib.sha256,
                             ).digest()
@@ -188,8 +188,8 @@ def process_campaign_step(campaign_name, schedule_name, previous_schedule_name=N
                         headers["X-Frappe-Webhook-Signature"] = signature
                     
                     try:
-                        requests.post(campaign_agent_base_url, headers=headers, data=payload_json, timeout=10)
-                        frappe.cache().set_value(f"ai_req:{campaign_name}:{schedule_name}", 1, expires_in_sec=86400)
+                        requests.post(cadence_agent_base_url, headers=headers, data=payload_json, timeout=10)
+                        frappe.cache().set_value(f"ai_req:{cadence_name}:{schedule_name}", 1, expires_in_sec=86400)
                     except Exception as e:
                         frappe.log_error(f"Failed to send task to Agent: {str(e)}", "Agent Error")
         else:
