@@ -4,6 +4,15 @@ from frappe_cadence.utils.enrichment import check_and_mark_stale_enrichments
 from frappe.utils import add_months, nowdate
 
 class TestEnrichmentUtils(IntegrationTestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        frappe.db.rollback()
+        super().tearDownClass()
+
     def setUp(self):
         # 1. Ensure master data exists
         for status in ["Pending", "Enriched", "Partial", "Stale", "Failed"]:
@@ -25,7 +34,7 @@ class TestEnrichmentUtils(IntegrationTestCase):
     def create_history(self, ref_dt, ref_dn, months_ago):
         history = frappe.get_doc({
             "doctype": "History",
-            "website": "https://example.com",
+            "url": "https://example.com",
             "reference_doctype": ref_dt,
             "reference_name": ref_dn
         }).insert(ignore_permissions=True)

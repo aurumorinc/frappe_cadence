@@ -6,18 +6,18 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "website",
+  "url",
   "content",
-  "image",
+  "images",
   "reference_doctype",
   "reference_name"
  ],
  "fields": [
   {
-   "fieldname": "website",
+   "fieldname": "url",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Website",
+   "label": "URL",
    "reqd": 1
   },
   {
@@ -28,9 +28,10 @@
    "label": "Content"
   },
   {
-   "fieldname": "image",
-   "fieldtype": "Attach Image",
-   "label": "Image"
+   "fieldname": "images",
+   "fieldtype": "Table",
+   "label": "Images",
+   "options": "History Image"
   },
   {
    "fieldname": "reference_doctype",
