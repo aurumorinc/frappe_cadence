@@ -73,7 +73,6 @@ class TestMultiChannelCadence(IntegrationTestCase):
         else:
             cls.lead_name = lead[0].name
 
-<<<<<<< ours:frappe_cadence/tests/integration/cadence/doctype/multi_channel_cadence/test_multi_channel_cadence.py
         # Create a master Cadence
         if not frappe.db.exists("Cadence", "_Test Master Cadence"):
             cls.master_cadence = frappe.get_doc({
@@ -99,73 +98,16 @@ class TestMultiChannelCadence(IntegrationTestCase):
             "doctype": "Multi Channel Cadence",
             "cadence_name": self.master_cadence.name,
             "cadence_for": "CRM Lead",
-||||||| ancestor
-    def setUp(self):
-        frappe.db.rollback()
-        
-        # Create a master Campaign
-        self.master_campaign = frappe.get_doc({
-            "doctype": "Campaign",
-            "campaign_name": "_Test Master Campaign",
-            "campaign_schedules": [
-                {"reference_doctype": "Email Template", "reference_name": "Test Email Template", "send_after_days": 1},
-                {"reference_doctype": "LinkedIn Template", "reference_name": "Test LinkedIn Template", "send_after_days": 2},
-                {"reference_doctype": "SMS Template", "reference_name": "Test SMS Template", "send_after_days": 3}
-            ]
-        }).insert(ignore_permissions=True)
-        
-        # Create a dummy campaign
-        self.campaign = frappe.get_doc({
-            "doctype": "Multi Channel Campaign",
-            "campaign_name": self.master_campaign.name,
-            "campaign_for": "CRM Lead",
-=======
-        # Create a master Campaign
-        if not frappe.db.exists("Campaign", "_Test Master Campaign"):
-            cls.master_campaign = frappe.get_doc({
-                "doctype": "Campaign",
-                "campaign_name": "_Test Master Campaign",
-                "campaign_schedules": [
-                    {"reference_doctype": "Email Template", "reference_name": "Test Email Template", "send_after_days": 1},
-                    {"reference_doctype": "LinkedIn Template", "reference_name": "Test LinkedIn Template", "send_after_days": 2},
-                    {"reference_doctype": "SMS Template", "reference_name": "Test SMS Template", "send_after_days": 3}
-                ]
-            }).insert(ignore_permissions=True)
-        else:
-            cls.master_campaign = frappe.get_doc("Campaign", "_Test Master Campaign")
-
-    @classmethod
-    def tearDownClass(cls):
-        frappe.db.rollback()
-        super().tearDownClass()
-
-    def setUp(self):
-        # Create a dummy campaign
-        self.campaign = frappe.get_doc({
-            "doctype": "Multi Channel Campaign",
-            "campaign_name": self.master_campaign.name,
-            "campaign_for": "CRM Lead",
->>>>>>> theirs:frappe_campaign/campaign/doctype/multi_channel_campaign/test_multi_channel_campaign.py
             "recipient": self.lead_name,
             "start_date": "2024-01-01",
             "status": "Scheduled"
         })
 
-<<<<<<< ours:frappe_cadence/tests/integration/cadence/doctype/multi_channel_cadence/test_multi_channel_cadence.py
     def tearDown(self):
         if self.cadence.name:
             frappe.delete_doc("Multi Channel Cadence", self.cadence.name, ignore_permissions=True, force=True)
 
     @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.enqueue")
-||||||| ancestor
-    @patch("frappe_campaign.campaign.doctype.multi_channel_campaign.multi_channel_campaign.enqueue")
-=======
-    def tearDown(self):
-        if self.campaign.name:
-            frappe.delete_doc("Multi Channel Campaign", self.campaign.name, ignore_permissions=True, force=True)
-
-    @patch("frappe_campaign.campaign.doctype.multi_channel_campaign.multi_channel_campaign.enqueue")
->>>>>>> theirs:frappe_campaign/campaign/doctype/multi_channel_campaign/test_multi_channel_campaign.py
     def test_on_update_cancels_existing_jobs(self, mock_enqueue):
         self.cadence.insert(ignore_permissions=True)
         mock_enqueue.reset_mock()
