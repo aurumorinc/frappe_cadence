@@ -1,8 +1,8 @@
 app_name = "frappe_cadence"
 app_title = "Frappe Cadence"
-app_publisher = "Aryan Singh"
+app_publisher = "Aurumor"
 app_description = "Open-Source Cold Outreach & Sales Engagement Automation"
-app_email = "aquiveal@gmail.com"
+app_email = "hello@aurumor.com"
 app_license = "mit"
 
 # Apps
