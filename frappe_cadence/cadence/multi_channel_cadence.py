@@ -5,6 +5,7 @@ import urllib.parse
 import hmac
 import hashlib
 import base64
+from frappe.utils import add_months, today, get_url
 from frappe_controller.utils.controller import wait_for_event, emit_event
 
 def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=None):
@@ -40,12 +41,19 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
 
     # 3. Process Template
     schedule = frappe.get_doc("Cadence Multi Channel Schedule", schedule_name)
+    mcc = frappe.get_doc("Multi Channel Cadence", cadence_name)
     
     template_doctype = f"{schedule.reference_doctype}"
     template_name = schedule.reference_name
     template = frappe.get_doc(template_doctype, template_name)
     
     channel = template_doctype.replace(" Template", "")
+
+    reference_cadence_provider = None
+    for row in (mcc.get("provider") or []):
+        if row.channel == channel:
+            reference_cadence_provider = row.reference_cadence_provider
+            break
 
     if template.status == "Enabled":
         comm = frappe.get_doc({
@@ -57,7 +65,8 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
             "reference_name": cadence_name,
             "cadence_schedule": schedule_name,
             "status": "Open",
-            "delivery_status": "Scheduled"
+            "delivery_status": "Scheduled",
+            "reference_cadence_provider": reference_cadence_provider
         })
         comm.insert(ignore_permissions=True)
         emit_event("cadence_step_completed", {"cadence_name": cadence_name, "schedule_name": schedule_name})
@@ -79,7 +88,8 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
                 "reference_doctype": "Multi Channel Cadence",
                 "reference_name": cadence_name,
                 "cadence_schedule": schedule_name,
-                "status": "Open"
+                "status": "Open",
+                "reference_cadence_provider": reference_cadence_provider
             })
             comm.insert(ignore_permissions=True)
             comm_name = comm.name
@@ -89,7 +99,6 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
             lead = frappe.get_doc(cadence.cadence_for, cadence.recipient)
             
             # Fetch History records
-            from frappe.utils import add_months, today, get_url
             three_months_ago = add_months(today(), -3)
             
             # Get history for lead
@@ -165,68 +174,31 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
             cache_val = frappe.cache().get_value(f"ai_req:{cadence_name}:{schedule_name}")
             
             if not cache_val:
-                # Send POST request to AI Agent webhook
-                cadence_agent_base_url = frappe.conf.get("cadence_agent_base_url")
-                cadence_agent_api_key = frappe.conf.get("cadence_agent_api_key")
-                cadence_agent_webhook_secret = frappe.conf.get("cadence_agent_webhook_secret")
+                sift_settings = frappe.get_single("Sift Settings")
+                sift_base_url = sift_settings.sift_base_url
+                sift_api_key = sift_settings.get_password("sift_api_key")
                 
-                if cadence_agent_base_url:
+                if sift_base_url:
                     headers = {"Content-Type": "application/json"}
-                    if cadence_agent_api_key:
-                        headers["Authorization"] = f"Bearer {cadence_agent_api_key}"
+                    if sift_api_key:
+                        headers["Authorization"] = f"Bearer {sift_api_key}"
                     
+                    # Add webhook info to payload so Sift knows where to callback
+                    webhook_url = get_url(f"/api/method/frappe_cadence.cadence.{channel.lower()}_template.callback")
+                    payload["metadata"]["webhook_url"] = webhook_url
+
                     payload_json = json.dumps(payload, separators=(',', ':'))
                     
-                    if cadence_agent_webhook_secret:
-                        signature = base64.b64encode(
-                            hmac.new(
-                                cadence_agent_webhook_secret.encode("utf8"),
-                                payload_json.encode("utf8"),
-                                hashlib.sha256,
-                            ).digest()
-                        ).decode("utf8")
-                        headers["X-Frappe-Webhook-Signature"] = signature
-                    
                     try:
-                        requests.post(cadence_agent_base_url, headers=headers, data=payload_json, timeout=10)
+                        requests.post(f"{sift_base_url}/agents", headers=headers, data=payload_json, timeout=10)
                         frappe.cache().set_value(f"ai_req:{cadence_name}:{schedule_name}", 1, expires_in_sec=86400)
                     except Exception as e:
-                        frappe.log_error(f"Failed to send task to Agent: {str(e)}", "Agent Error")
+                        frappe.log_error(title="Agent Error", message=f"Failed to send task to Agent: {str(e)}")
+                        return
+                else:
+                    frappe.log_error(title="Sift Configuration Error", message="Sift Base URL not configured.")
+                    return
         else:
             comm_name = draft_comm[0].name
             
-        wait_for_event("ai_agent_callback", condition=f"argument.get('communication_id') == '{comm_name}'")
-
-@frappe.whitelist(allow_guest=True)
-def callback():
-    """
-    Webhook endpoint for AI callbacks.
-    """
-    try:
-        payload = frappe.request.json
-        communication_id = payload.get("metadata", {}).get("name")
-        
-        if not communication_id:
-            return {"status": "error", "message": "Missing communication_id in metadata"}
-            
-        output_text = payload.get("output", [{}])[0].get("content", [{}])[0].get("text")
-        if not output_text:
-            return {"status": "error", "message": "Missing output text"}
-            
-        parsed_json = json.loads(output_text)
-        
-        comm = frappe.get_doc("Communication", communication_id)
-        if parsed_json.get("subject"):
-            comm.subject = parsed_json.get("subject")
-        else:
-            comm.subject = f"{comm.communication_medium} Message"
-        comm.content = parsed_json.get("content")
-        comm.delivery_status = "Scheduled"
-        comm.save(ignore_permissions=True)
-        
-        emit_event("ai_agent_callback", {"communication_id": communication_id})
-        
-        return {"status": "success"}
-    except Exception as e:
-        frappe.log_error(f"AI Agent Callback Error: {str(e)}", "Agent Error")
-        return {"status": "error", "message": str(e)}
+        wait_for_event("callback", condition=f"argument.get('communication_id') == '{comm_name}'")
