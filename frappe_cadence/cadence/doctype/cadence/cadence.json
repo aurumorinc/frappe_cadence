@@ -11,12 +11,20 @@
  "field_order": [
   "cadence",
   "cadence_name",
+  "reference_playbook",
   "naming_series",
   "cadence_code",
   "cadence_schedules_section",
   "cadence_schedules",
   "description_section",
-  "description"
+  "description",
+  "assignment_rules_section",
+  "assign_condition",
+  "assign_condition_json",
+  "assign_to_users_section",
+  "rule",
+  "users",
+  "last_user"
  ],
  "fields": [
   {
@@ -32,6 +40,13 @@
    "oldfieldname": "cadence_name",
    "oldfieldtype": "Data",
    "reqd": 1
+  },
+  {
+   "fieldname": "reference_playbook",
+   "fieldtype": "Link",
+   "label": "Reference Playbook",
+   "options": "Playbook",
+   "read_only": 1
   },
   {
    "fieldname": "naming_series",
@@ -71,12 +86,54 @@
    "oldfieldname": "description",
    "oldfieldtype": "Text",
    "width": "300px"
+  },
+  {
+   "fieldname": "assignment_rules_section",
+   "fieldtype": "Section Break",
+   "label": "Assignment Rules"
+  },
+  {
+   "fieldname": "assign_condition",
+   "fieldtype": "Code",
+   "label": "Assign Condition",
+   "options": "PythonExpression"
+  },
+  {
+   "fieldname": "assign_condition_json",
+   "fieldtype": "Code",
+   "hidden": 1,
+   "label": "Assign Condition JSON"
+  },
+  {
+   "fieldname": "assign_to_users_section",
+   "fieldtype": "Section Break",
+   "label": "Assign To Users"
+  },
+  {
+   "default": "Round Robin",
+   "fieldname": "rule",
+   "fieldtype": "Select",
+   "label": "Rule",
+   "options": "Round Robin\nLoad Balancing"
+  },
+  {
+   "fieldname": "users",
+   "fieldtype": "Table MultiSelect",
+   "label": "Users",
+   "options": "Assignment Rule User"
+  },
+  {
+   "fieldname": "last_user",
+   "fieldtype": "Link",
+   "label": "Last User",
+   "options": "User",
+   "read_only": 1
   }
  ],
  "icon": "fa fa-bullhorn",
  "idx": 1,
  "links": [],
- "modified": "2024-03-27 13:06:43.861206",
+ "modified": "2026-07-02 20:11:17.700891",
  "modified_by": "Administrator",
  "module": "Cadence",
  "name": "Cadence",
@@ -114,6 +171,7 @@
   }
  ],
  "quick_entry": 1,
+ "row_format": "Dynamic",
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": []
