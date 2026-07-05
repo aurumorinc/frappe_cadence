@@ -77,11 +77,11 @@ doctype_list_js = {"Communication" : "cadence/doctype/communication/communicatio
 # ----------
 
 # add methods and filters to jinja environment
-jinja = {
-	"methods": [
-		"frappe_cadence.utils.jinja.get_sequence_message"
-	]
-}
+# jinja = {
+# 	"methods": [
+# 		"frappe_cadence.cadence.doctype.cadence.cadence.get_sequence_message"
+# 	]
+# }
 
 # Installation
 # ------------
@@ -136,30 +136,36 @@ jinja = {
 doc_events = {
 	"Email Template": {
 		"before_save": [
-			"frappe_cadence.utils.email_template.before_save"
+			"frappe_cadence.cadence.doctype.email_template.email_template.before_save"
 		]
 	},
 	"Email Cadence": {
-		"after_insert": "frappe_cadence.utils.crm_lead.sync_lead_cadence",
-		"on_update": "frappe_cadence.utils.crm_lead.sync_lead_cadence",
-		"on_trash": "frappe_cadence.utils.crm_lead.remove_lead_cadence"
+		"after_insert": "frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.sync_lead_cadence",
+		"on_update": "frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.sync_lead_cadence",
+		"on_trash": "frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.remove_lead_cadence"
+	},
+	"CRM Lead": {
+		"on_update": "frappe_cadence.cadence.doctype.cadence.cadence.enqueue_lead_evaluation"
+	},
+	"Communication": {
+		"after_insert": "frappe_cadence.cadence.doctype.communication.communication.on_communication_create",
+		"on_update": "frappe_cadence.cadence.doctype.communication.communication.on_communication_update"
+	},
+	"Playbook Execution": {
+		"on_update": "frappe_cadence.cadence.doctype.playbook_execution.playbook_execution.on_update"
 	}
 }
 
 # Scheduled Tasks
 # ---------------
 
-scheduler_events = {
-	"daily": [
-		"frappe_cadence.utils.enrichment.check_and_mark_stale_enrichments"
-	]
-}
+scheduler_events = {}
 
 # Controller Events
 # -----------------
 
 controller_events = {
-	"frappe_cadence.cadence.agent.process_cadence_step": {
+	"frappe_cadence.cadence.multi_channel_cadence.process_cadence_step": {
 		"rate_limit_per_minute": 50,
 		"retries": 3,
 		"timeout": 300
