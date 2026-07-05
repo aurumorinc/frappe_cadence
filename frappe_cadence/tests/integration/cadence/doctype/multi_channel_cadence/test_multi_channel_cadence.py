@@ -22,7 +22,8 @@ class TestMultiChannelCadence(IntegrationTestCase):
             })
             doc.insert(ignore_permissions=True)
             
-        if not frappe.db.exists("Controller Job Type", "frappe_cadence.cadence.agent.process_cadence_step"):
+        cjt = frappe.db.exists("Controller Job Type", {"method": "frappe_cadence.cadence.multi_channel_cadence.process_cadence_step"})
+        if not cjt:
             if not frappe.db.exists("DocType", "Controller Job Type"):
                 doc = frappe.get_doc({
                     "doctype": "DocType",
@@ -35,11 +36,13 @@ class TestMultiChannelCadence(IntegrationTestCase):
                 })
                 doc.insert(ignore_permissions=True)
             
-            frappe.get_doc({
+            doc = frappe.get_doc({
                 "doctype": "Controller Job Type",
-                "name": "frappe_cadence.cadence.agent.process_cadence_step",
-                "method": "frappe_cadence.cadence.agent.process_cadence_step"
+                "method": "frappe_cadence.cadence.multi_channel_cadence.process_cadence_step"
             }).insert(ignore_permissions=True)
+            cls.cjt_name = doc.name
+        else:
+            cls.cjt_name = cjt
             
         # Create templates
         for dt in ["Email Template", "LinkedIn Template", "SMS Template"]:
@@ -90,6 +93,12 @@ class TestMultiChannelCadence(IntegrationTestCase):
     @classmethod
     def tearDownClass(cls):
         frappe.db.rollback()
+        
+        # Explicit teardown for hardcoded entities as a fallback
+        frappe.db.delete("Multi Channel Cadence", {"cadence_name": "_Test Master Cadence"})
+        frappe.db.delete("Cadence", {"cadence_name": "_Test Master Cadence"})
+        frappe.db.delete("Communication", {"reference_doctype": "Multi Channel Cadence", "reference_name": "_Test Master Cadence"})
+        
         super().tearDownClass()
 
     def setUp(self):
@@ -116,14 +125,14 @@ class TestMultiChannelCadence(IntegrationTestCase):
         job1 = frappe.get_doc({
             "doctype": "FS Job",
             "status": "queued",
-            "job_type": "frappe_cadence.cadence.agent.process_cadence_step",
+            "job_type": self.cjt_name,
             "arguments": json.dumps({"cadence_name": self.cadence.name})
         }).insert(ignore_permissions=True)
         
         job2 = frappe.get_doc({
             "doctype": "FS Job",
             "status": "started",
-            "job_type": "frappe_cadence.cadence.agent.process_cadence_step",
+            "job_type": self.cjt_name,
             "arguments": json.dumps({"cadence_name": self.cadence.name})
         }).insert(ignore_permissions=True)
         
@@ -143,9 +152,9 @@ class TestMultiChannelCadence(IntegrationTestCase):
         self.assertEqual(mock_enqueue.call_count, 3)
         
         calls = [
-            call("frappe_cadence.cadence.agent.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[0].name, previous_schedule_name=None),
-            call("frappe_cadence.cadence.agent.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[1].name, previous_schedule_name=self.master_cadence.cadence_schedules[0].name),
-            call("frappe_cadence.cadence.agent.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[2].name, previous_schedule_name=self.master_cadence.cadence_schedules[1].name)
+            call("frappe_cadence.cadence.multi_channel_cadence.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[0].name, previous_schedule_name=None, now=True),
+            call("frappe_cadence.cadence.multi_channel_cadence.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[1].name, previous_schedule_name=self.master_cadence.cadence_schedules[0].name, now=True),
+            call("frappe_cadence.cadence.multi_channel_cadence.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[2].name, previous_schedule_name=self.master_cadence.cadence_schedules[1].name, now=True)
         ]
         mock_enqueue.assert_has_calls(calls)
 
@@ -171,8 +180,8 @@ class TestMultiChannelCadence(IntegrationTestCase):
         self.assertEqual(mock_enqueue.call_count, 2)
         
         calls = [
-            call("frappe_cadence.cadence.agent.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[1].name, previous_schedule_name=self.master_cadence.cadence_schedules[0].name),
-            call("frappe_cadence.cadence.agent.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[2].name, previous_schedule_name=self.master_cadence.cadence_schedules[1].name)
+            call("frappe_cadence.cadence.multi_channel_cadence.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[1].name, previous_schedule_name=self.master_cadence.cadence_schedules[0].name, now=True),
+            call("frappe_cadence.cadence.multi_channel_cadence.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[2].name, previous_schedule_name=self.master_cadence.cadence_schedules[1].name, now=True)
         ]
         mock_enqueue.assert_has_calls(calls)
 

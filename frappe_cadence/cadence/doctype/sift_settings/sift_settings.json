@@ -1,0 +1,47 @@
+{
+ "actions": [],
+ "creation": "2024-05-18 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "sift_base_url",
+  "sift_api_key"
+ ],
+ "fields": [
+  {
+   "fieldname": "sift_base_url",
+   "fieldtype": "Data",
+   "label": "Sift Base URL",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sift_api_key",
+   "fieldtype": "Password",
+   "label": "Sift API Key",
+   "reqd": 1
+  }
+ ],
+ "issingle": 1,
+ "modified": "2024-05-18 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cadence",
+ "name": "Sift Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

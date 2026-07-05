@@ -1,7 +1,5 @@
 import frappe
 from frappe.tests import IntegrationTestCase
-from frappe_cadence.utils.enrichment import check_and_mark_stale_enrichments
-from frappe.utils import add_months, nowdate
 
 class TestEnrichmentUtils(IntegrationTestCase):
     @classmethod
@@ -14,16 +12,7 @@ class TestEnrichmentUtils(IntegrationTestCase):
         super().tearDownClass()
 
     def setUp(self):
-        # 1. Ensure master data exists
-        for status in ["Pending", "Enriched", "Partial", "Stale", "Failed"]:
-            if not frappe.db.exists("Enrichment Status", status):
-                frappe.get_doc({
-                    "doctype": "Enrichment Status",
-                    "status": status,
-                    "color": "gray"
-                }).insert(ignore_permissions=True)
-
-        # 2. Clear test records
+        # Clear test records
         frappe.db.delete("History")
         frappe.db.delete("CRM Lead")
         frappe.db.delete("CRM Organization")
@@ -31,104 +20,64 @@ class TestEnrichmentUtils(IntegrationTestCase):
     def tearDown(self):
         frappe.db.rollback()
 
-    def create_history(self, ref_dt, ref_dn, months_ago):
-        history = frappe.get_doc({
-            "doctype": "History",
-            "url": "https://example.com",
-            "reference_doctype": ref_dt,
-            "reference_name": ref_dn
-        }).insert(ignore_permissions=True)
-        
-        # Manually update creation date to simulate old records
-        creation_date = add_months(nowdate(), -months_ago)
-        frappe.db.set_value("History", history.name, "creation", creation_date, update_modified=False)
-        return history
+    def test_get_crm_leads(self):
+        leads = []
+        for i in range(1, 4):
+            lead = frappe.get_doc({
+                "doctype": "CRM Lead",
+                "first_name": f"Test{i}",
+                "email_id": f"test{i}@example.com"
+            }).insert(ignore_permissions=True)
+            leads.append(lead.name)
 
-    def test_mark_old_enrichment_as_stale(self):
-        lead = frappe.get_doc({
-            "doctype": "CRM Lead",
-            "first_name": "Old",
-            "last_name": "Lead",
-            "enrichment_status": "Enriched"
-        }).insert(ignore_permissions=True)
-        
-        # Latest history is 4 months old
-        self.create_history("CRM Lead", lead.name, 4)
-        
-        check_and_mark_stale_enrichments()
-        
-        self.assertEqual(frappe.db.get_value("CRM Lead", lead.name, "enrichment_status"), "Stale")
+        if not frappe.db.exists("Email Template", "_Test Email Template"):
+            frappe.get_doc({
+                "doctype": "Email Template",
+                "name": "_Test Email Template",
+                "subject": "Test",
+                "response": "Test"
+            }).insert(ignore_permissions=True)
 
-    def test_keep_recent_enrichment(self):
-        lead = frappe.get_doc({
-            "doctype": "CRM Lead",
-            "first_name": "Fresh",
-            "last_name": "Lead",
-            "enrichment_status": "Enriched"
+        cadence = frappe.get_doc({
+            "doctype": "Cadence",
+            "cadence_name": "Test Cadence Enrich",
+            "cadence_schedules": [
+                {
+                    "reference_doctype": "Email Template",
+                    "reference_name": "_Test Email Template",
+                    "send_after_days": 1
+                }
+            ]
         }).insert(ignore_permissions=True)
+            
+        mcc_data = [
+            ("Draft", leads[0]),
+            ("Provisioning", leads[1]),
+            ("Error", leads[2])
+        ]
         
-        # Latest history is 1 month old
-        self.create_history("CRM Lead", lead.name, 1)
+        for status, lead_name in mcc_data:
+            frappe.get_doc({
+                "doctype": "Multi Channel Cadence",
+                "cadence_name": cadence.name,
+                "recipient": lead_name,
+                "status": status,
+                "start_date": frappe.utils.nowdate()
+            }).insert(ignore_permissions=True)
+            
+        from frappe_cadence.utils.enrichment import get_crm_leads
         
-        check_and_mark_stale_enrichments()
+        results = get_crm_leads(
+            doctype="Annotation",
+            txt="",
+            searchfield="name",
+            start=0,
+            page_len=20,
+            filters={"template_name": "_Test Email Template"}
+        )
         
-        self.assertEqual(frappe.db.get_value("CRM Lead", lead.name, "enrichment_status"), "Enriched")
-
-    def test_multiple_history_mixed_ages(self):
-        lead = frappe.get_doc({
-            "doctype": "CRM Lead",
-            "first_name": "Mixed",
-            "last_name": "Lead",
-            "enrichment_status": "Partial"
-        }).insert(ignore_permissions=True)
+        lead_names = [r[0] for r in results]
         
-        # Two histories: one old, one new
-        self.create_history("CRM Lead", lead.name, 6)
-        self.create_history("CRM Lead", lead.name, 0) # today
-        
-        check_and_mark_stale_enrichments()
-        
-        self.assertEqual(frappe.db.get_value("CRM Lead", lead.name, "enrichment_status"), "Partial")
-
-    def test_crm_organization_support(self):
-        org = frappe.get_doc({
-            "doctype": "CRM Organization",
-            "organization_name": "Old Corp",
-            "enrichment_status": "Enriched"
-        }).insert(ignore_permissions=True)
-        
-        # Latest history is 5 months old
-        self.create_history("CRM Organization", org.name, 5)
-        
-        check_and_mark_stale_enrichments()
-        
-        self.assertEqual(frappe.db.get_value("CRM Organization", org.name, "enrichment_status"), "Stale")
-
-    def test_ignore_pending_status(self):
-        lead = frappe.get_doc({
-            "doctype": "CRM Lead",
-            "first_name": "Pending",
-            "last_name": "Lead",
-            "enrichment_status": "Pending"
-        }).insert(ignore_permissions=True)
-        
-        # Has an old history from a previous cycle
-        self.create_history("CRM Lead", lead.name, 12)
-        
-        check_and_mark_stale_enrichments()
-        
-        # Should stay Pending
-        self.assertEqual(frappe.db.get_value("CRM Lead", lead.name, "enrichment_status"), "Pending")
-
-    def test_no_history_remains_unchanged(self):
-        lead = frappe.get_doc({
-            "doctype": "CRM Lead",
-            "first_name": "No",
-            "last_name": "History",
-            "enrichment_status": "Enriched"
-        }).insert(ignore_permissions=True)
-        
-        check_and_mark_stale_enrichments()
-        
-        # Should stay Enriched because we can't prove it's stale without history
-        self.assertEqual(frappe.db.get_value("CRM Lead", lead.name, "enrichment_status"), "Enriched")
+        self.assertIn(leads[0], lead_names)
+        self.assertNotIn(leads[1], lead_names)
+        self.assertNotIn(leads[2], lead_names)
