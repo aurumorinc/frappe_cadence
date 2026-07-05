@@ -15,15 +15,17 @@
  "fields": [
   {
    "fieldname": "reference_doctype",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "label": "Reference DocType",
-   "hidden": 1
+   "options": "DocType",
+   "in_list_view": 1
   },
   {
    "fieldname": "reference_name",
-   "fieldtype": "Data",
+   "fieldtype": "Dynamic Link",
    "label": "Reference Name",
-   "hidden": 1
+   "options": "reference_doctype",
+   "in_list_view": 1
   },
   {
    "fieldname": "input",
