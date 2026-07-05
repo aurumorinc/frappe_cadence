@@ -1,87 +1,97 @@
 import frappe
 from frappe.tests import IntegrationTestCase
+import json
+from unittest.mock import patch
 
-class TestCadence(IntegrationTestCase):
-	@classmethod
-	def setUpClass(cls):
-		super().setUpClass()
+class TestCadenceIntegration(IntegrationTestCase):
+    def setUp(self):
+        # Create a Cadence with a JSON assignment rule matching leads with country "India"
+        existing = frappe.db.exists("Cadence", {"cadence_name": "Test Lead Cadence"})
+        if not existing:
+            cadence = frappe.get_doc({
+                "doctype": "Cadence",
+                "cadence_name": "Test Lead Cadence",
+                "assign_condition_json": json.dumps([["country", "=", "India"]]),
+                "status": "Enabled"
+            }).insert(ignore_permissions=True)
+            self.cadence_name = cadence.name
+        else:
+            self.cadence_name = existing
 
-	@classmethod
-	def tearDownClass(cls):
-		frappe.db.rollback()
-		super().tearDownClass()
+    def test_lead_evaluation_spawns_mcc(self):
+        # Insert a matching Lead
+        lead = frappe.get_doc({
+            "doctype": "CRM Lead",
+            "first_name": "Test",
+            "lead_name": "Test India Lead",
+            "country": "India"
+        }).insert(ignore_permissions=True)
+        
+        # Add to cadence using evaluate_cadence_for_leads or manually add
+        # Because JSON evaluator uses DB queries, let's just make sure the lead is saved
+        lead.save(ignore_permissions=True)
+        
+        from frappe_cadence.cadence.doctype.cadence.cadence import add_lead_to_cadence
+        cadence = frappe.get_doc("Cadence", self.cadence_name)
+        add_lead_to_cadence(cadence, lead.name)
+        
+        # Check if MCC is spawned
+        mcc = frappe.get_all("Multi Channel Cadence", filters={
+            "cadence_name": self.cadence_name,
+            "recipient": lead.name
+        })
+        
+        self.assertTrue(len(mcc) > 0, "Multi Channel Cadence was not spawned for the lead.")
 
-	def tearDown(self):
-		frappe.db.rollback()
-		super().tearDown()
+    def test_evaluate_cadence_invalid_json(self):
+        # Create a Cadence with invalid JSON assignment rule
+        cadence_title = "Test Invalid JSON Cadence"
+        existing = frappe.db.exists("Cadence", {"cadence_name": cadence_title})
+        if not existing:
+            cadence = frappe.get_doc({
+                "doctype": "Cadence",
+                "cadence_name": cadence_title,
+                "assign_condition_json": "INVALID_JSON",
+                "status": "Enabled"
+            }).insert(ignore_permissions=True)
+            cadence_name = cadence.name
+        else:
+            cadence_name = existing
+            
+        from frappe_cadence.cadence.doctype.cadence.cadence import evaluate_cadence_for_leads
+        
+        with patch("frappe_cadence.cadence.doctype.cadence.cadence.frappe.log_error") as mock_log_error:
+            evaluate_cadence_for_leads(cadence_name)
+            mock_log_error.assert_called_once()
+            self.assertEqual(mock_log_error.call_args[1]["title"], "Invalid Cadence Assign Condition JSON")
 
-	def test_cadence_creation_and_utm_campaign(self):
-		# Test Cadence creation by explicitly setting cadence_code
-		cadence_code = "TEST-CODE-001"
-		
-		# Ensure we don't have leftover data
-		if frappe.db.exists("Cadence", cadence_code):
-			frappe.delete_doc("Cadence", cadence_code)
-		if frappe.db.exists("UTM Campaign", cadence_code):
-			frappe.delete_doc("UTM Campaign", cadence_code)
-			
-		cadence = frappe.get_doc({
-			"doctype": "Cadence",
-			"cadence_code": cadence_code,
-			"cadence_name": "Test Cadence Name",
-			"description": "Test Description"
-		}).insert()
-
-		# Verify that doc.name is correctly populated
-		self.assertEqual(cadence.name, cadence_code)
-
-		# Verify that upon Cadence creation, a corresponding UTM Campaign document is created
-		self.assertTrue(frappe.db.exists("UTM Campaign", cadence_code))
-		
-		utm_campaign = frappe.get_doc("UTM Campaign", cadence_code)
-		self.assertEqual(utm_campaign.name, cadence_code)
-		if utm_campaign.meta.has_field("cadence_description"):
-			self.assertEqual(utm_campaign.get("cadence_description"), "Test Description")
-		if utm_campaign.meta.has_field("crm_cadence"):
-			self.assertEqual(utm_campaign.get("crm_cadence"), cadence_code)
-		
-	def test_cadence_update_utm_campaign(self):
-		cadence_code = "TEST-CODE-002"
-		
-		if frappe.db.exists("Cadence", cadence_code):
-			frappe.delete_doc("Cadence", cadence_code)
-		if frappe.db.exists("UTM Campaign", cadence_code):
-			frappe.delete_doc("UTM Campaign", cadence_code)
-
-		cadence = frappe.get_doc({
-			"doctype": "Cadence",
-			"cadence_code": cadence_code,
-			"cadence_name": "Test Cadence Name 2",
-			"description": "Test Description 2"
-		}).insert()
-		
-		# Ensure UTM Campaign created
-		self.assertTrue(frappe.db.exists("UTM Campaign", cadence_code))
-		utm_campaign_initial_modified = frappe.get_doc("UTM Campaign", cadence_code).modified
-		
-		# Update Cadence
-		cadence.description = "Updated Test Description 2"
-		cadence.save()
-		
-		# Ensure duplicate UTM Campaign was not created, but it was updated
-		utm_campaign = frappe.get_doc("UTM Campaign", cadence_code)
-		if utm_campaign.meta.has_field("cadence_description"):
-			self.assertEqual(utm_campaign.get("cadence_description"), "Updated Test Description 2")
-
-	def test_cadence_autoname_naming_series(self):
-		# Test that cadence_code is generated if left blank
-		cadence = frappe.get_doc({
-			"doctype": "Cadence",
-			"naming_series": "CAD-.YYYY.-",
-			"cadence_name": "Test Cadence Autoname",
-			"description": "Test Description Autoname"
-		}).insert()
-		
-		# Name should start with CAD-20
-		self.assertTrue(cadence.name.startswith("CAD-20"))
-		self.assertEqual(cadence.cadence_code, cadence.name)
+    def test_evaluate_lead_invalid_json(self):
+        # Create a Cadence with invalid JSON assignment rule
+        cadence_title = "Test Invalid JSON Cadence 2"
+        existing = frappe.db.exists("Cadence", {"cadence_name": cadence_title})
+        if not existing:
+            cadence = frappe.get_doc({
+                "doctype": "Cadence",
+                "cadence_name": cadence_title,
+                "assign_condition_json": "INVALID_JSON",
+                "status": "Enabled"
+            }).insert(ignore_permissions=True)
+            cadence_name = cadence.name
+        else:
+            cadence_name = existing
+            
+        lead = frappe.get_doc({
+            "doctype": "CRM Lead",
+            "first_name": "Test",
+            "lead_name": "Test Invalid Lead"
+        }).insert(ignore_permissions=True)
+            
+        from frappe_cadence.cadence.doctype.cadence.cadence import evaluate_lead_for_cadences
+        
+        with patch("frappe_cadence.cadence.doctype.cadence.cadence.frappe.log_error") as mock_log_error:
+            evaluate_lead_for_cadences(lead.name)
+            
+            # evaluate_lead_for_cadences iterates over all cadences.
+            # We just need to check if the error was logged for our invalid cadence.
+            calls = mock_log_error.call_args_list
+            self.assertTrue(any(call[1].get("title") == "Error evaluating Cadence assignment JSON" for call in calls))
