@@ -13,7 +13,7 @@ frappe.ui.form.on("Cadence", {
 				__("View Leads"),
 				function () {
 					frappe.route_options = { utm_source: "Cadence", utm_campaign: frm.doc.name };
-					frappe.set_route("List", "Lead");
+					frappe.set_route("List", "CRM Lead");
 				},
 				"fa fa-list",
 				true

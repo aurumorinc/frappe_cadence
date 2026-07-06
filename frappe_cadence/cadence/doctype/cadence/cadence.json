@@ -58,8 +58,8 @@
   {
    "fieldname": "cadence_code",
    "fieldtype": "Data",
+   "hidden": 1,
    "label": "Cadence Code",
-   "reqd": 1,
    "set_only_once": 1,
    "unique": 1
   },
