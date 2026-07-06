@@ -130,35 +130,47 @@ def evaluate_cadence_for_leads(cadence_name):
 		frappe.log_error(title="Cadence evaluation failed", message=f"Cadence {cadence_name} does not exist.")
 		return
 
-	if not cadence.assign_condition_json:
+	if not cadence.assign_condition_json and not cadence.assign_condition:
 		return
 		
-	try:
-		filters = json.loads(cadence.assign_condition_json)
-	except (json.JSONDecodeError, TypeError) as e:
-		frappe.log_error(title="Invalid Cadence Assign Condition JSON", message=str(e))
-		return
-	
-	if not isinstance(filters, list):
-		frappe.log_error(title="Invalid Cadence Assign Condition JSON", message="Filters must be a list.")
-		return
-		
-	# Build subquery to exclude already enrolled leads
-	email_cadence = frappe.qb.DocType("Multi Channel Cadence")
-	subquery = frappe.qb.from_(email_cadence).select(email_cadence.recipient).where(email_cadence.cadence_name == cadence_name)
+	# Fetch already enrolled leads
+	enrolled_leads = frappe.get_all(
+		"Multi Channel Cadence",
+		filters={"cadence_name": cadence_name},
+		pluck="recipient"
+	)
 
-	# Append the exclusion filter
-	filters.append(["name", "not in", subquery])
+	if cadence.assign_condition_json:
+		try:
+			filters = json.loads(cadence.assign_condition_json)
+			if not isinstance(filters, list):
+				frappe.log_error(title="Invalid Cadence Assign Condition JSON", message="Filters must be a list.")
+			else:
+				# Append the exclusion filter
+				if enrolled_leads:
+					filters.append(["name", "not in", enrolled_leads])
+				try:
+					# Fetch leads directly matching the condition
+					targeted_leads = frappe.get_all("CRM Lead", filters=filters, pluck="name")
+					for lead_name in targeted_leads:
+						add_lead_to_cadence(cadence, lead_name)
+				except Exception as e:
+					frappe.log_error(title="Error evaluating Cadence assignment JSON", message=str(e))
+		except (json.JSONDecodeError, TypeError) as e:
+			frappe.log_error(title="Invalid Cadence Assign Condition JSON", message=str(e))
 
-	try:
-		# Fetch leads directly matching the condition
-		targeted_leads = frappe.get_all("CRM Lead", filters=filters, pluck="name")
-	except Exception as e:
-		frappe.log_error(title="Error evaluating Cadence assignment", message=str(e))
-		return
-		
-	for lead_name in targeted_leads:
-		add_lead_to_cadence(cadence, lead_name)
+	if cadence.assign_condition:
+		try:
+			filters = []
+			if enrolled_leads:
+				filters.append(["name", "not in", enrolled_leads])
+			unenrolled_leads = frappe.get_all("CRM Lead", filters=filters, pluck="name")
+			for lead_name in unenrolled_leads:
+				doc = frappe.get_doc("CRM Lead", lead_name)
+				if frappe.safe_eval(cadence.assign_condition, None, {"doc": doc}):
+					add_lead_to_cadence(cadence, lead_name)
+		except Exception as e:
+			frappe.log_error(title="Error evaluating Cadence assignment Python", message=str(e))
 
 def evaluate_lead_for_cadences(lead_name):
 	"""Evaluates a single Lead against all Cadences."""

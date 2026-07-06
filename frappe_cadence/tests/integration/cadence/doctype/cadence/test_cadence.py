@@ -4,87 +4,117 @@ import json
 from unittest.mock import patch
 
 class TestCadenceIntegration(IntegrationTestCase):
-    def setUp(self):
-        # Create a Cadence with a JSON assignment rule matching leads with country "India"
-        existing = frappe.db.exists("Cadence", {"cadence_name": "Test Lead Cadence"})
-        if not existing:
-            cadence = frappe.get_doc({
-                "doctype": "Cadence",
-                "cadence_name": "Test Lead Cadence",
-                "assign_condition_json": json.dumps([["country", "=", "India"]]),
-                "status": "Enabled"
-            }).insert(ignore_permissions=True)
-            self.cadence_name = cadence.name
-        else:
-            self.cadence_name = existing
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        from frappe.tests.utils import make_test_records
+        make_test_records("CRM Lead Status")
 
-    def test_lead_evaluation_spawns_mcc(self):
+    @classmethod
+    def tearDownClass(cls):
+        frappe.db.rollback()
+        super().tearDownClass()
+
+    def test_evaluate_cadence_with_json_condition(self):
+        # Create a Cadence with a JSON assignment rule matching leads with territory "India"
+        cadence = frappe.get_doc({
+            "doctype": "Cadence",
+            "cadence_name": "Test JSON Lead Cadence",
+            "assign_condition_json": json.dumps([["territory", "=", "India"]]),
+            "status": "Enabled"
+        }).insert(ignore_permissions=True)
+        
         # Insert a matching Lead
         lead = frappe.get_doc({
             "doctype": "CRM Lead",
             "first_name": "Test",
-            "lead_name": "Test India Lead",
-            "country": "India"
-        }).insert(ignore_permissions=True)
+            "lead_name": "Test India JSON Lead",
+            "territory": "India"
+        }).insert(ignore_permissions=True, ignore_links=True, ignore_mandatory=True)
         
-        # Add to cadence using evaluate_cadence_for_leads or manually add
-        # Because JSON evaluator uses DB queries, let's just make sure the lead is saved
-        lead.save(ignore_permissions=True)
-        
-        from frappe_cadence.cadence.doctype.cadence.cadence import add_lead_to_cadence
-        cadence = frappe.get_doc("Cadence", self.cadence_name)
-        add_lead_to_cadence(cadence, lead.name)
+        from frappe_cadence.cadence.doctype.cadence.cadence import evaluate_cadence_for_leads
+        evaluate_cadence_for_leads(cadence.name)
         
         # Check if MCC is spawned
         mcc = frappe.get_all("Multi Channel Cadence", filters={
-            "cadence_name": self.cadence_name,
+            "cadence_name": cadence.name,
             "recipient": lead.name
         })
         
-        self.assertTrue(len(mcc) > 0, "Multi Channel Cadence was not spawned for the lead.")
+        self.assertTrue(len(mcc) > 0, "Multi Channel Cadence was not spawned for the JSON lead.")
+
+    def test_evaluate_cadence_with_python_condition(self):
+        # Create a Cadence with a Python assignment rule matching leads with status "New"
+        cadence = frappe.get_doc({
+            "doctype": "Cadence",
+            "cadence_name": "Test Python Lead Cadence",
+            "assign_condition": "doc.status == 'New'",
+            "status": "Enabled"
+        }).insert(ignore_permissions=True)
+        
+        # Insert a matching Lead
+        lead_new = frappe.get_doc({
+            "doctype": "CRM Lead",
+            "first_name": "Test",
+            "lead_name": "Test New Python Lead",
+            "status": "New"
+        }).insert(ignore_permissions=True, ignore_links=True, ignore_mandatory=True)
+
+        # Insert a non-matching Lead
+        lead_replied = frappe.get_doc({
+            "doctype": "CRM Lead",
+            "first_name": "Test",
+            "lead_name": "Test Replied Python Lead",
+            "status": "Replied"
+        }).insert(ignore_permissions=True, ignore_links=True, ignore_mandatory=True)
+        
+        from frappe_cadence.cadence.doctype.cadence.cadence import evaluate_cadence_for_leads
+        evaluate_cadence_for_leads(cadence.name)
+        
+        # Check if MCC is spawned for matching lead
+        mcc_new = frappe.get_all("Multi Channel Cadence", filters={
+            "cadence_name": cadence.name,
+            "recipient": lead_new.name
+        })
+        self.assertTrue(len(mcc_new) > 0, "Multi Channel Cadence was not spawned for the matching lead.")
+
+        # Check if MCC is NOT spawned for non-matching lead
+        mcc_replied = frappe.get_all("Multi Channel Cadence", filters={
+            "cadence_name": cadence.name,
+            "recipient": lead_replied.name
+        })
+        self.assertEqual(len(mcc_replied), 0, "Multi Channel Cadence was incorrectly spawned for non-matching lead.")
 
     def test_evaluate_cadence_invalid_json(self):
         # Create a Cadence with invalid JSON assignment rule
-        cadence_title = "Test Invalid JSON Cadence"
-        existing = frappe.db.exists("Cadence", {"cadence_name": cadence_title})
-        if not existing:
-            cadence = frappe.get_doc({
-                "doctype": "Cadence",
-                "cadence_name": cadence_title,
-                "assign_condition_json": "INVALID_JSON",
-                "status": "Enabled"
-            }).insert(ignore_permissions=True)
-            cadence_name = cadence.name
-        else:
-            cadence_name = existing
+        cadence = frappe.get_doc({
+            "doctype": "Cadence",
+            "cadence_name": "Test Invalid JSON Cadence",
+            "assign_condition_json": "INVALID_JSON",
+            "status": "Enabled"
+        }).insert(ignore_permissions=True)
             
         from frappe_cadence.cadence.doctype.cadence.cadence import evaluate_cadence_for_leads
         
         with patch("frappe_cadence.cadence.doctype.cadence.cadence.frappe.log_error") as mock_log_error:
-            evaluate_cadence_for_leads(cadence_name)
+            evaluate_cadence_for_leads(cadence.name)
             mock_log_error.assert_called_once()
             self.assertEqual(mock_log_error.call_args[1]["title"], "Invalid Cadence Assign Condition JSON")
 
     def test_evaluate_lead_invalid_json(self):
         # Create a Cadence with invalid JSON assignment rule
-        cadence_title = "Test Invalid JSON Cadence 2"
-        existing = frappe.db.exists("Cadence", {"cadence_name": cadence_title})
-        if not existing:
-            cadence = frappe.get_doc({
-                "doctype": "Cadence",
-                "cadence_name": cadence_title,
-                "assign_condition_json": "INVALID_JSON",
-                "status": "Enabled"
-            }).insert(ignore_permissions=True)
-            cadence_name = cadence.name
-        else:
-            cadence_name = existing
+        cadence = frappe.get_doc({
+            "doctype": "Cadence",
+            "cadence_name": "Test Invalid JSON Cadence 2",
+            "assign_condition_json": "INVALID_JSON",
+            "status": "Enabled"
+        }).insert(ignore_permissions=True)
             
         lead = frappe.get_doc({
             "doctype": "CRM Lead",
             "first_name": "Test",
             "lead_name": "Test Invalid Lead"
-        }).insert(ignore_permissions=True)
+        }).insert(ignore_permissions=True, ignore_links=True, ignore_mandatory=True)
             
         from frappe_cadence.cadence.doctype.cadence.cadence import evaluate_lead_for_cadences
         
