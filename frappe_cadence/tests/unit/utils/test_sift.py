@@ -20,6 +20,26 @@ class TestSiftUtils(IntegrationTestCase):
         frappe.db.set_single_value("Sift Settings", "sift_base_url", "https://api.sift.example.com")
         frappe.db.set_single_value("Sift Settings", "sift_api_key", "test_api_key")
 
+        # Setup Model
+        cls.model_provider = frappe.get_doc({
+            "doctype": "Model Provider",
+            "model_provider_name": "TestProvider"
+        })
+        try:
+            cls.model_provider.insert(ignore_if_duplicate=True)
+        except Exception:
+            pass
+            
+        cls.model = frappe.get_doc({
+            "doctype": "Model",
+            "model_name": "test-model-4o",
+            "provider": "TestProvider"
+        })
+        try:
+            cls.model.insert(ignore_if_duplicate=True)
+        except Exception:
+            pass
+
         # Setup Email Template
         cls.template = frappe.get_doc({
             "doctype": "Email Template",
@@ -27,7 +47,9 @@ class TestSiftUtils(IntegrationTestCase):
             "subject": "Test",
             "system_prompt": "You are a helpful assistant",
             "user_prompt": "Write an email",
-            "status": "Enabled"
+            "status": "Enabled",
+            "model": "test-model-4o"
+
         }).insert(ignore_if_duplicate=True)
 
         # Setup Annotation
@@ -87,6 +109,8 @@ class TestSiftUtils(IntegrationTestCase):
         self.assertEqual(payload.get("agent_name"), f"agent-{self.template.name}")
         self.assertIn("optimize_callback", payload.get("webhook_url"))
         self.assertEqual(payload.get("metadata").get("template_name"), self.template.name)
+        
+        self.assertEqual(payload.get("litellm_params").get("model"), "testprovider/test-model-4o")
         
         train_data = payload.get("dspy_params").get("state").get("default").get("train")
         self.assertEqual(len(train_data), 1)

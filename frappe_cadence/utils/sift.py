@@ -48,6 +48,16 @@ def get_history(reference_doctype: str, reference_name: str) -> list:
 def optimize(template_doctype: str, template_name: str) -> None:
     template = frappe.get_doc(template_doctype, template_name)
     
+    if not template.model:
+        frappe.throw(f"No LLM Model linked to {template_doctype} {template_name}.")
+    
+    model_doc = frappe.get_doc("Model", template.model)
+    
+    if model_doc.provider and "/" not in model_doc.model_name:
+        model_str = f"{model_doc.provider.lower()}/{model_doc.model_name}"
+    else:
+        model_str = model_doc.model_name
+    
     template.db_set("status", "Optimizing")
     
     base_url, api_key = get_sift_settings()
@@ -79,7 +89,7 @@ def optimize(template_doctype: str, template_name: str) -> None:
             "template_name": template_name
         },
         "litellm_params": {
-            "model": "openai/gpt-4o"
+            "model": model_str
         },
         "dspy_params": {
             "state": {
