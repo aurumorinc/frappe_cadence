@@ -61,11 +61,14 @@ class TestSiftUtils(IntegrationTestCase):
         frappe.db.rollback()
         super().tearDownClass()
 
+    @patch("frappe_cadence.utils.sift.get_history")
     @patch("frappe_cadence.utils.sift.requests.post")
-    def test_optimize(self, mock_post):
+    def test_optimize(self, mock_post, mock_get_history):
         mock_response = MagicMock()
         mock_response.raise_for_status.return_value = None
         mock_post.return_value = mock_response
+        
+        mock_get_history.return_value = [{"role": "user", "content": [{"type": "text", "text": "test history"}]}]
         
         from frappe_cadence.utils.sift import optimize
         
@@ -81,12 +84,25 @@ class TestSiftUtils(IntegrationTestCase):
         self.assertEqual(url, "https://api.sift.example.com/agents")
         
         payload = call_args[1].get("json")
-        self.assertEqual(payload.get("system_prompt"), "You are a helpful assistant")
-        self.assertEqual(payload.get("user_prompt"), "Write an email")
-        self.assertEqual(len(payload.get("few_shot_examples")), 1)
-        self.assertEqual(payload.get("few_shot_examples")[0].get("output"), "test output 2")
+        self.assertEqual(payload.get("agent_name"), f"agent-{self.template.name}")
         self.assertIn("optimize_callback", payload.get("webhook_url"))
         self.assertEqual(payload.get("metadata").get("template_name"), self.template.name)
+        
+        train_data = payload.get("dspy_params").get("state").get("default").get("train")
+        self.assertEqual(len(train_data), 1)
+        
+        training_example = train_data[0]
+        self.assertEqual(training_example.get("trace_id"), self.annotation2.name)
+        self.assertEqual(training_example.get("feedback"), "test output 2")
+        
+        messages = training_example.get("messages")
+        self.assertEqual(len(messages), 3)
+        self.assertEqual(messages[0].get("role"), "system")
+        self.assertEqual(messages[0].get("content"), "You are a helpful assistant")
+        self.assertEqual(messages[1].get("role"), "user")
+        self.assertEqual(messages[1].get("content")[0].get("text"), "test history")
+        self.assertEqual(messages[2].get("role"), "user")
+        self.assertEqual(messages[2].get("content")[0].get("text"), "test input 2")
 
     def test_optimize_callback(self):
         from frappe_cadence.utils.sift import optimize_callback
@@ -106,11 +122,14 @@ class TestSiftUtils(IntegrationTestCase):
         self.assertEqual(self.template.sift_id, "sift-agent-123")
         self.assertEqual(self.template.status, "Disabled")
 
+    @patch("frappe_cadence.utils.sift.get_history")
     @patch("frappe_cadence.utils.sift.requests.post")
-    def test_predict(self, mock_post):
+    def test_predict(self, mock_post, mock_get_history):
         mock_response = MagicMock()
         mock_response.raise_for_status.return_value = None
         mock_post.return_value = mock_response
+        
+        mock_get_history.return_value = [{"role": "user", "content": [{"type": "text", "text": "test history predict"}]}]
         
         # Ensure we have a sift_id
         self.template.db_set("sift_id", "sift-agent-123")
@@ -129,10 +148,18 @@ class TestSiftUtils(IntegrationTestCase):
         self.assertEqual(url, "https://api.sift.example.com/responses")
         
         payload = call_args[1].get("json")
-        self.assertEqual(payload.get("agent_name"), "sift-agent-123")
-        self.assertEqual(payload.get("input"), "test input")
+        self.assertEqual(payload.get("model"), "sift-agent-123")
         self.assertIn("predict_callback", payload.get("webhook_url"))
         self.assertEqual(payload.get("metadata").get("annotation_id"), self.annotation.name)
+        
+        messages = payload.get("input")
+        self.assertEqual(len(messages), 3)
+        self.assertEqual(messages[0].get("role"), "system")
+        self.assertEqual(messages[0].get("content"), "You are a helpful assistant")
+        self.assertEqual(messages[1].get("role"), "user")
+        self.assertEqual(messages[1].get("content")[0].get("text"), "test history predict")
+        self.assertEqual(messages[2].get("role"), "user")
+        self.assertEqual(messages[2].get("content")[0].get("text"), "test input")
 
     def test_predict_callback(self):
         from frappe_cadence.utils.sift import predict_callback
