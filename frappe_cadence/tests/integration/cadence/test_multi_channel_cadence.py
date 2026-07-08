@@ -187,15 +187,21 @@ class TestAgentUtils(IntegrationTestCase):
 
     @patch("frappe_cadence.cadence.multi_channel_cadence.requests.post")
     @patch("frappe_cadence.cadence.multi_channel_cadence.wait_for_event")
-    
-    def test_process_step_prompt_template_sends_webhook(self, mock_wait, mock_post):
+    @patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_all")
+    @patch("frappe_cadence.cadence.multi_channel_cadence.get_url")
+    def test_process_step_prompt_template_sends_webhook(self, mock_get_url, mock_get_all, mock_wait, mock_post):
+        mock_get_url.return_value = "http://test.com/webhook"
+        
+        def get_all_side_effect(doctype, *args, **kwargs):
+            return []
+        mock_get_all.side_effect = get_all_side_effect
         
         original_get_doc = frappe.get_doc
         with patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_doc") as mock_get_doc:
             
             mock_schedule = frappe._dict(reference_doctype="Email Template", reference_name="Test Email Template")
-            mock_template = frappe._dict(status="Prompt", subject="Test")
-            mock_cadence = frappe._dict(cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name)
+            mock_template = frappe._dict(status="Prompt", subject="Test", annotations=[frappe._dict(input="")])
+            mock_cadence = frappe._dict(cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id")
             mock_lead = frappe._dict(name=self.lead_name, organization=None)
             
             def side_effect(*args, **kwargs):
@@ -214,12 +220,14 @@ class TestAgentUtils(IntegrationTestCase):
 
     @patch("frappe_cadence.cadence.multi_channel_cadence.requests.post")
     @patch("frappe_cadence.cadence.multi_channel_cadence.wait_for_event")
-    
+    @patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_all")
+    @patch("frappe_cadence.cadence.multi_channel_cadence.get_url")
     @patch("frappe.utils.redis_wrapper.RedisWrapper.get_value")
-    def test_process_step_prompt_template_skips_webhook_if_cached(self, mock_get_value, mock_wait, mock_post):
+    def test_process_step_prompt_template_skips_webhook_if_cached(self, mock_get_value, mock_get_url, mock_get_all, mock_wait, mock_post):
+        mock_get_url.return_value = "http://test.com/webhook"
         
         # Create draft communication
-        frappe.get_doc({
+        comm = frappe.get_doc({
             "doctype": "Communication",
             "communication_medium": "Email",
             "subject": "Test",
@@ -229,16 +237,29 @@ class TestAgentUtils(IntegrationTestCase):
             "status": "Open"
         }).insert(ignore_permissions=True)
         
+        def get_all_side_effect(doctype, *args, **kwargs):
+            if doctype == "Communication":
+                # For idempotency check we return [], but for draft comm check we return [comm]
+                if kwargs.get("filters", {}).get("delivery_status"):
+                    return []
+                return [frappe._dict(name=comm.name)]
+            return []
+        mock_get_all.side_effect = get_all_side_effect
+        
         original_get_doc = frappe.get_doc
         with patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_doc") as mock_get_doc:
             
             mock_schedule = frappe._dict(reference_doctype="Email Template", reference_name="Test Email Template")
-            mock_template = frappe._dict(status="Prompt", subject="Test")
+            mock_template = frappe._dict(status="Prompt", subject="Test", annotations=[frappe._dict(input="")])
+            mock_cadence = frappe._dict(cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id")
+            mock_lead = frappe._dict(name=self.lead_name, organization=None)
             
             def side_effect(*args, **kwargs):
                 dt = args[0] if args else kwargs.get("doctype")
                 if dt == "Cadence Multi Channel Schedule": return mock_schedule
                 if dt == "Email Template": return mock_template
+                if dt == "Multi Channel Cadence": return mock_cadence
+                if dt == "CRM Lead": return mock_lead
                 return original_get_doc(*args, **kwargs)
             mock_get_doc.side_effect = side_effect
             
@@ -250,7 +271,15 @@ class TestAgentUtils(IntegrationTestCase):
     @patch("frappe_cadence.cadence.multi_channel_cadence.frappe.log_error")
     @patch("frappe_cadence.cadence.multi_channel_cadence.requests.post")
     @patch("frappe_cadence.cadence.multi_channel_cadence.wait_for_event")
-    def test_process_step_missing_sift_settings(self, mock_wait, mock_post, mock_log_error):
+    @patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_all")
+    @patch("frappe_cadence.cadence.multi_channel_cadence.get_url")
+    def test_process_step_missing_sift_settings(self, mock_get_url, mock_get_all, mock_wait, mock_post, mock_log_error):
+        mock_get_url.return_value = "http://test.com/webhook"
+        
+        def get_all_side_effect(doctype, *args, **kwargs):
+            return []
+        mock_get_all.side_effect = get_all_side_effect
+        
         # Create draft communication
         frappe.get_doc({
             "doctype": "Communication",
@@ -270,11 +299,15 @@ class TestAgentUtils(IntegrationTestCase):
         with patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_doc") as mock_get_doc:
             mock_schedule = frappe._dict(reference_doctype="Email Template", reference_name="Test Email Template")
             mock_template = frappe._dict(status="Prompt", subject="Test")
+            mock_cadence = frappe._dict(cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id")
+            mock_lead = frappe._dict(name=self.lead_name, organization=None)
             
             def side_effect(*args, **kwargs):
                 dt = args[0] if args else kwargs.get("doctype")
                 if dt == "Cadence Multi Channel Schedule": return mock_schedule
                 if dt == "Email Template": return mock_template
+                if dt == "Multi Channel Cadence": return mock_cadence
+                if dt == "CRM Lead": return mock_lead
                 return original_get_doc(*args, **kwargs)
             mock_get_doc.side_effect = side_effect
             
@@ -289,15 +322,21 @@ class TestAgentUtils(IntegrationTestCase):
 
     @patch("frappe_cadence.cadence.multi_channel_cadence.requests.post")
     @patch("frappe_cadence.cadence.multi_channel_cadence.wait_for_event")
-    
-    def test_process_step_schema_generation_email(self, mock_wait, mock_post):
+    @patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_all")
+    @patch("frappe_cadence.cadence.multi_channel_cadence.get_url")
+    def test_process_step_schema_generation_email(self, mock_get_url, mock_get_all, mock_wait, mock_post):
+        mock_get_url.return_value = "http://test.com/webhook"
+        
+        def get_all_side_effect(doctype, *args, **kwargs):
+            return []
+        mock_get_all.side_effect = get_all_side_effect
         
         original_get_doc = frappe.get_doc
         with patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_doc") as mock_get_doc:
             
             mock_schedule = frappe._dict(reference_doctype="Email Template", reference_name="Test Email Template")
-            mock_template = frappe._dict(status="Prompt", subject="Test")
-            mock_cadence = frappe._dict(cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name)
+            mock_template = frappe._dict(status="Prompt", subject="Test", annotations=[frappe._dict(input="")])
+            mock_cadence = frappe._dict(cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id")
             mock_lead = frappe._dict(name=self.lead_name, organization=None)
             
             def side_effect(*args, **kwargs):
@@ -320,7 +359,15 @@ class TestAgentUtils(IntegrationTestCase):
 
     @patch("frappe_cadence.cadence.multi_channel_cadence.requests.post")
     @patch("frappe_cadence.cadence.multi_channel_cadence.wait_for_event")
-    def test_process_step_webhook_retry_on_cache_expire(self, mock_wait, mock_post):
+    @patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_all")
+    @patch("frappe_cadence.cadence.multi_channel_cadence.get_url")
+    def test_process_step_webhook_retry_on_cache_expire(self, mock_get_url, mock_get_all, mock_wait, mock_post):
+        mock_get_url.return_value = "http://test.com/webhook"
+        
+        def get_all_side_effect(doctype, *args, **kwargs):
+            return []
+        mock_get_all.side_effect = get_all_side_effect
+        
         # Create draft communication
         frappe.get_doc({
             "doctype": "Communication",
@@ -338,8 +385,8 @@ class TestAgentUtils(IntegrationTestCase):
         original_get_doc = frappe.get_doc
         with patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_doc") as mock_get_doc:
             mock_schedule = frappe._dict(reference_doctype="Email Template", reference_name="Test Email Template")
-            mock_template = frappe._dict(status="Prompt", subject="Test")
-            mock_cadence = frappe._dict(cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name)
+            mock_template = frappe._dict(status="Prompt", subject="Test", annotations=[frappe._dict(input="")])
+            mock_cadence = frappe._dict(cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id")
             mock_lead = frappe._dict(name=self.lead_name, organization=None)
             
             def side_effect(*args, **kwargs):
@@ -359,15 +406,27 @@ class TestAgentUtils(IntegrationTestCase):
 
     @patch("frappe_cadence.cadence.multi_channel_cadence.requests.post")
     @patch("frappe_cadence.cadence.multi_channel_cadence.wait_for_event")
-    
-    def test_process_step_schema_generation_non_email(self, mock_wait, mock_post):
+    @patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_all")
+    @patch("frappe_cadence.cadence.multi_channel_cadence.get_url")
+    def test_process_step_schema_generation_non_email(self, mock_get_url, mock_get_all, mock_wait, mock_post):
+        mock_get_url.return_value = "http://test.com/webhook"
+        
+        def get_all_side_effect(doctype, *args, **kwargs):
+            if doctype == "Communication":
+                return []
+            if doctype == "History":
+                return []
+            if doctype == "History Image":
+                return []
+            return frappe.get_all(doctype, *args, **kwargs)
+        mock_get_all.side_effect = get_all_side_effect
         
         original_get_doc = frappe.get_doc
         with patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_doc") as mock_get_doc:
             
             mock_schedule = frappe._dict(reference_doctype="LinkedIn Template", reference_name="Test LinkedIn Template")
-            mock_template = frappe._dict(status="Prompt")
-            mock_cadence = frappe._dict(cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name)
+            mock_template = frappe._dict(status="Prompt", annotations=[frappe._dict(input="")])
+            mock_cadence = frappe._dict(cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id")
             mock_lead = frappe._dict(name=self.lead_name, organization=None)
             
             def side_effect(*args, **kwargs):
@@ -387,4 +446,77 @@ class TestAgentUtils(IntegrationTestCase):
         self.assertIn("content", schema["properties"])
         self.assertNotIn("subject", schema["required"])
         self.assertIn("content", schema["required"])
+
+    @patch("frappe_cadence.cadence.multi_channel_cadence.requests.post")
+    @patch("frappe_cadence.cadence.multi_channel_cadence.wait_for_event")
+    @patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_all")
+    @patch("frappe_cadence.cadence.multi_channel_cadence.get_url")
+    def test_process_step_multimodal_payload_construction(self, mock_get_url, mock_get_all, mock_wait, mock_post):
+        mock_get_url.return_value = "http://test.com/webhook"
+        import os
+        
+        # 1. Create a real File record pointing to a local file
+        test_file_path = "test_image_for_sift.png"
+        with open(frappe.get_site_path("public", "files", test_file_path), "wb") as f:
+            f.write(b"fake image data")
+            
+        file_doc = frappe._dict(
+            file_name=test_file_path,
+            is_private=1,
+            file_url="/private/files/test_image_for_sift.png",
+            presigned_url="https://s3.example.com/test_image_for_sift.png?sig=123"
+        )
+
+        def get_all_side_effect(doctype, *args, **kwargs):
+            if doctype == "Communication":
+                return []
+            if doctype == "History":
+                return [frappe._dict(name="HIST-001", content="A very important email.")]
+            if doctype == "History Image":
+                return [frappe._dict(image="/private/files/test_image_for_sift.png")]
+            return []
+        mock_get_all.side_effect = get_all_side_effect
+        
+        original_get_doc = frappe.get_doc
+        with patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_doc") as mock_get_doc:
+            mock_schedule = frappe._dict(reference_doctype="Email Template", reference_name="Test Email Template")
+            mock_template = frappe._dict(status="Prompt", system_prompt="Sys Prompt", user_prompt="User Prompt", annotations=[frappe._dict(input="")])
+            mock_cadence = frappe._dict(cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_model_123")
+            mock_lead = frappe._dict(name=self.lead_name, organization=None)
+            
+            def side_effect(*args, **kwargs):
+                dt = args[0] if args else kwargs.get("doctype")
+                if dt == "Cadence Multi Channel Schedule": return mock_schedule
+                if dt == "Email Template": return mock_template
+                if dt == "Multi Channel Cadence": return mock_cadence
+                if dt == "CRM Lead": return mock_lead
+                if dt == "File": return file_doc
+                return original_get_doc(*args, **kwargs)
+            mock_get_doc.side_effect = side_effect
+            
+            process_cadence_step(self.cadence_name, self.schedule_name)
+            
+        payload = json.loads(mock_post.call_args[1]["data"])
+        
+        # Assertions for payload format
+        self.assertEqual(payload["model"], "test_model_123")
+        self.assertEqual(payload["input"][0]["role"], "system")
+        self.assertEqual(payload["input"][0]["content"], "Sys Prompt")
+        
+        history_msg = payload["input"][1]
+        self.assertEqual(history_msg["role"], "user")
+        self.assertEqual(history_msg["content"][0]["type"], "text")
+        self.assertEqual(history_msg["content"][0]["text"], "A very important email.")
+        
+        self.assertEqual(history_msg["content"][1]["type"], "image_url")
+        self.assertTrue(history_msg["content"][1]["image_url"]["url"].startswith("http"))
+        self.assertIn("?sig=", history_msg["content"][1]["image_url"]["url"]) # Ensure presigned URL
+        
+        self.assertEqual(payload["input"][2]["role"], "user")
+        self.assertEqual(payload["input"][2]["content"][0]["type"], "text")
+        self.assertEqual(payload["input"][2]["content"][0]["text"], "User Prompt")
+        
+        import os
+        if os.path.exists(frappe.get_site_path("public", "files", test_file_path)):
+            os.remove(frappe.get_site_path("public", "files", test_file_path))
 

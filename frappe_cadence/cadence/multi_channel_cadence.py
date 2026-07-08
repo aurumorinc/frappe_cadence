@@ -153,23 +153,43 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
                 "input": [
                     {
                         "role": "system",
-                        "content": [{"type": "input_text", "text": getattr(template, "system_prompt", "")}]
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "input_text", "text": getattr(template, "user_prompt", "") or (template.annotations[-1].input if getattr(template, "annotations", None) else "")}
-                        ]
+                        "content": getattr(template, "system_prompt", "")
                     }
                 ]
             }
             
             for history in histories:
-                if history.image:
-                    payload["input"][1]["content"].append({
-                        "type": "input_image",
-                        "image_url": get_url(history.image)
-                    })
+                content_blocks = []
+                if history.content:
+                    content_blocks.append({"type": "text", "text": history.content})
+                    
+                history_images = frappe.get_all(
+                    "History Image",
+                    filters={"parent": history.name, "parenttype": "History"},
+                    fields=["image"]
+                )
+                
+                for img in history_images:
+                    if img.image:
+                        try:
+                            file_doc = frappe.get_doc("File", {"file_url": img.image})
+                            content_blocks.append({
+                                "type": "image_url",
+                                "image_url": {"url": file_doc.presigned_url}
+                            })
+                        except frappe.DoesNotExistError:
+                            pass
+                
+                if content_blocks:
+                    payload["input"].append({"role": "user", "content": content_blocks})
+
+            payload["input"].append({
+                "role": "user",
+                "content": [{"type": "text", "text": getattr(template, "user_prompt", "") or (template.annotations[-1].input if getattr(template, "annotations", None) else "")}]
+            })
+            
+            # Use /responses endpoint instead of /agents and map cadence model
+            payload["model"] = cadence.sift_id or "default-model"
             
             cache_val = frappe.cache().get_value(f"ai_req:{cadence_name}:{schedule_name}")
             
@@ -190,7 +210,7 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
                     payload_json = json.dumps(payload, separators=(',', ':'))
                     
                     try:
-                        requests.post(f"{sift_base_url}/agents", headers=headers, data=payload_json, timeout=10)
+                        requests.post(f"{sift_base_url}/responses", headers=headers, data=payload_json, timeout=10)
                         frappe.cache().set_value(f"ai_req:{cadence_name}:{schedule_name}", 1, expires_in_sec=86400)
                     except Exception as e:
                         frappe.log_error(title="Agent Error", message=f"Failed to send task to Agent: {str(e)}")
