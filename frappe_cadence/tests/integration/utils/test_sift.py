@@ -24,8 +24,8 @@ class TestSiftIntegration(IntegrationTestCase):
 
         # 3. Create a Provider and Model
         provider = frappe.get_doc({
-            "doctype": "Provider",
-            "provider_name": "OpenAI"
+            "doctype": "Model Provider",
+            "model_provider_name": "OpenAI"
         })
         provider.insert(ignore_permissions=True, ignore_if_duplicate=True)
 
