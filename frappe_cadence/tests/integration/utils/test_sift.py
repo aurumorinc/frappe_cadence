@@ -73,7 +73,7 @@ class TestSiftIntegration(IntegrationTestCase):
             "parenttype": "Email Template",
             "reference_doctype": "CRM Lead",
             "reference_name": lead.name,
-            "sender": "sift_test_user@example.com",
+            "sender": "Administrator",
             "output": "Expected Output"
         })
         annotation.insert(ignore_permissions=True)
@@ -90,8 +90,8 @@ class TestSiftIntegration(IntegrationTestCase):
         def get_value_side_effect(*args, **kwargs):
             dt = args[0] if args else kwargs.get("doctype")
             fieldname = kwargs.get("fieldname") or (args[2] if len(args) > 2 else None)
-            if dt == "User" and fieldname == ["full_name", "bio"]:
-                return frappe._dict(full_name="Sift Test", bio="<p>This is a <strong>test</strong> bio.</p>")
+            if dt == "User" and isinstance(fieldname, list) and "bio" in fieldname:
+                return frappe._dict(name="Administrator", full_name="Sift Test", bio="<p>This is a <strong>test</strong> bio.</p>")
             return original_get_value(*args, **kwargs)
 
         with patch.object(frappe.db, "get_value", side_effect=get_value_side_effect):
