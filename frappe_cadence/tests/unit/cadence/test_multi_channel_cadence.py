@@ -85,6 +85,7 @@ class TestMultiChannelCadence(UnitTestCase):
         mock_mcc = MagicMock()
         mock_mcc.cadence_for = "CRM Lead"
         mock_mcc.recipient = "LEAD-001"
+        mock_mcc.owner = "user@test.com"
         mock_mcc.sift_id = "agent-mcc"
         row = MagicMock()
         row.channel = "Email"
@@ -151,11 +152,20 @@ class TestMultiChannelCadence(UnitTestCase):
                 return mock_sift_settings
             return original_get_single(*args, **kwargs)
             
+        original_get_value = frappe.db.get_value
+        def get_value_side_effect(*args, **kwargs):
+            doctype = kwargs.get("doctype") or (args[0] if len(args) > 0 else None)
+            filters = kwargs.get("filters") or (args[1] if len(args) > 1 else None)
+            if doctype == "User" and filters == "user@test.com":
+                return {"full_name": "Test User", "bio": "<p>I am a <strong>bold</strong> user.</p>"}
+            return original_get_value(*args, **kwargs)
+            
         with patch.object(frappe, "get_doc", side_effect=get_doc_side_effect):
             with patch.object(frappe, "get_single", side_effect=get_single_side_effect):
-                with patch("frappe_cadence.cadence.multi_channel_cadence.frappe.cache") as mock_cache:
-                    mock_cache.return_value.get_value.return_value = None
-                    process_cadence_step("MCC-001", "SCHED-001")
+                with patch.object(frappe.db, "get_value", side_effect=get_value_side_effect):
+                    with patch("frappe_cadence.cadence.multi_channel_cadence.frappe.cache") as mock_cache:
+                        mock_cache.return_value.get_value.return_value = None
+                        process_cadence_step("MCC-001", "SCHED-001")
                     
                     # Assert
                     mock_post.assert_called_once()
@@ -263,7 +273,9 @@ class TestMultiChannelCadence(UnitTestCase):
         # Mock frappe.db.get_value to return HTML bio
         original_get_value = frappe.db.get_value
         def get_value_side_effect(*args, **kwargs):
-            if args[0] == "User" and args[1] == "user@test.com":
+            doctype = kwargs.get("doctype") or (args[0] if len(args) > 0 else None)
+            filters = kwargs.get("filters") or (args[1] if len(args) > 1 else None)
+            if doctype == "User" and filters == "user@test.com":
                 return {"full_name": "Test User", "bio": "<p>I am a <strong>bold</strong> user.</p>"}
             return original_get_value(*args, **kwargs)
             

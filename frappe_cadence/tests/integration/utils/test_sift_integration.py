@@ -32,11 +32,17 @@ class TestSiftIntegration(IntegrationTestCase):
         settings.sift_api_key = "test_key"
         settings.save(ignore_permissions=True)
 
-        # 3. Create a Model
+        # 3. Create a Provider and Model
+        provider = frappe.get_doc({
+            "doctype": "Provider",
+            "provider_name": "OpenAI"
+        })
+        provider.insert(ignore_permissions=True, ignore_if_duplicate=True)
+
         model = frappe.get_doc({
             "doctype": "Model",
             "model_name": "gpt-4",
-            "provider": "OpenAI"
+            "provider": provider.name
         })
         model.insert(ignore_permissions=True, ignore_if_duplicate=True)
 
