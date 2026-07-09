@@ -1,7 +1,6 @@
 import frappe
 import requests
 from typing import Dict, Any
-from markdownify import markdownify
 
 def get_sift_settings() -> tuple:
     settings = frappe.get_single("Sift Settings")
@@ -16,7 +15,34 @@ def get_history(reference_doctype: str, reference_name: str) -> list:
         fields=["name", "content"],
         order_by="creation asc"
     )
-    return "\n\n".join([markdownify(h.content) for h in histories if h.content])
+    
+    messages = []
+    for h in histories:
+        content_blocks = []
+        if h.content:
+            content_blocks.append({"type": "text", "text": h.content})
+            
+        history_images = frappe.get_all(
+            "History Image",
+            filters={"parent": h.name, "parenttype": "History"},
+            fields=["image"]
+        )
+        
+        for img in history_images:
+            if img.image:
+                try:
+                    file_doc = frappe.get_doc("File", {"file_url": img.image})
+                    content_blocks.append({
+                        "type": "image_url",
+                        "image_url": {"url": file_doc.presigned_url}
+                    })
+                except frappe.DoesNotExistError:
+                    pass
+
+        if content_blocks:
+            messages.append({"role": "user", "content": content_blocks})
+            
+    return messages
 
 @frappe.whitelist()
 def optimize(template_doctype: str, template_name: str) -> None:
@@ -40,26 +66,20 @@ def optimize(template_doctype: str, template_name: str) -> None:
     train_data = []
     
     for ann in annotations:
-        if getattr(ann, "output", None):
-            history_context = get_history_content(ann.reference_doctype, ann.reference_name)
+        if ann.input and ann.output:
+            messages = [{"role": "system", "content": template.system_prompt}]
             
-            sender_name = ""
-            sender_bio = ""
-            if getattr(ann, "sender", None):
-                sender = frappe.db.get_value("User", ann.sender, ["full_name", "bio"], as_dict=True) or {}
-                print("ANN SENDER IS:", getattr(ann, "sender", "MISSING")); sender_name = sender.get("full_name", "")
-                bio = sender.get("bio", "")
-                if bio:
-                    sender_bio = markdownify(bio)
+            history_messages = get_history(ann.reference_doctype, ann.reference_name)
+            messages.extend(history_messages)
             
-            example = {
-                "input": template.user_prompt,
-                "output": ann.output,
-                "history": history_context,
-                "senders_name": sender_name,
-                "senders_bio": sender_bio
-            }
-            few_shot_examples.append(example)
+            messages.append({"role": "user", "content": [{"type": "text", "text": ann.input}]})
+            
+            train_data.append({
+                "trace_id": ann.name,
+                "score": 1.0,
+                "messages": messages,
+                "feedback": ann.output
+            })
             
     payload = {
         "agent_name": f"agent-{template_name}",
@@ -139,7 +159,7 @@ def predict(template_doctype: str, template_name: str) -> None:
     has_pending = False
     
     for ann in annotations:
-        if not getattr(ann, "output", None):
+        if not ann.output:
             has_pending = True
             
             messages = [{"role": "system", "content": template.system_prompt}]
@@ -147,21 +167,8 @@ def predict(template_doctype: str, template_name: str) -> None:
             messages.extend(history_messages)
             messages.append({"role": "user", "content": [{"type": "text", "text": ann.input}]})
             
-            sender_name = ""
-            sender_bio = ""
-            if getattr(ann, "sender", None):
-                sender = frappe.db.get_value("User", ann.sender, ["full_name", "bio"], as_dict=True) or {}
-                print("ANN SENDER IS:", getattr(ann, "sender", "MISSING")); sender_name = sender.get("full_name", "")
-                bio = sender.get("bio", "")
-                if bio:
-                    sender_bio = markdownify(bio)
-            
             payload = {
-                "agent_name": template.sift_id,
-                "input": template.user_prompt,
-                "history": history_context,
-                "senders_name": sender_name,
-                "senders_bio": sender_bio,
+                "model": template.sift_id,
                 "webhook_url": webhook_url,
                 "metadata": {
                     "annotation_id": ann.name
