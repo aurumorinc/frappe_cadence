@@ -51,8 +51,6 @@ class TestSiftIntegration(IntegrationTestCase):
             "doctype": "Email Template",
             "title": "Sift Test Template",
             "subject": "Test Subject",
-            "system_prompt": "System Prompt Content",
-            "user_prompt": "User Prompt Content",
             "model": model.name,
             "status": "Enabled"
         })
@@ -110,21 +108,16 @@ class TestSiftIntegration(IntegrationTestCase):
         self.assertEqual(trace["feedback"], "Expected Output")
         
         messages = trace["messages"]
-        self.assertEqual(len(messages), 3) # System, History, User
+        self.assertEqual(len(messages), 2) # System, History
         
         # Check System prompt has sender name and bio
         system_content = messages[0]["content"]
-        self.assertIn("System Prompt Content", system_content)
         self.assertIn("Sender Name: Sift Test", system_content)
         self.assertIn("This is a **test** bio.", system_content) # Markdown converted
         
         # Check History has markdown
         history_content = messages[1]["content"]
         self.assertEqual(history_content[0]["text"].strip(), "History *test*") # Markdown converted
-        
-        # Check User prompt
-        user_content = messages[2]["content"]
-        self.assertEqual(user_content[0]["text"], "User Prompt Content")
 
         # Cleanup
         template.delete()

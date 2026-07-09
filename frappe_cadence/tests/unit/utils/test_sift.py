@@ -45,11 +45,8 @@ class TestSiftUtils(IntegrationTestCase):
             "doctype": "Email Template",
             "name": "Test Sift Template",
             "subject": "Test",
-            "system_prompt": "You are a helpful assistant",
-            "user_prompt": "Write an email",
             "status": "Enabled",
             "model": "test-model-4o"
-
         }).insert(ignore_if_duplicate=True)
 
         # Setup Annotation
@@ -134,16 +131,13 @@ class TestSiftUtils(IntegrationTestCase):
         self.assertEqual(training_example.get("feedback"), "test output 2")
         
         messages = training_example.get("messages")
-        self.assertEqual(len(messages), 3)
+        self.assertEqual(len(messages), 2)
         self.assertEqual(messages[0].get("role"), "system")
-        self.assertIn("You are a helpful assistant", messages[0].get("content"))
         self.assertIn("Test Sender", messages[0].get("content"))
         self.assertIn("**Bold Bio**", messages[0].get("content"))
         
         self.assertEqual(messages[1].get("role"), "user")
         self.assertEqual(messages[1].get("content")[0].get("text"), "test history")
-        self.assertEqual(messages[2].get("role"), "user")
-        self.assertEqual(messages[2].get("content")[0].get("text"), "Write an email")
 
     def test_optimize_callback(self):
         from frappe_cadence.utils.sift import optimize_callback
@@ -208,16 +202,13 @@ class TestSiftUtils(IntegrationTestCase):
         self.assertEqual(payload.get("metadata").get("annotation_id"), self.annotation.name)
         
         messages = payload.get("input")
-        self.assertEqual(len(messages), 3)
+        self.assertEqual(len(messages), 2)
         self.assertEqual(messages[0].get("role"), "system")
-        self.assertIn("You are a helpful assistant", messages[0].get("content"))
         self.assertIn("Test Sender", messages[0].get("content"))
         self.assertIn("**Bold Bio**", messages[0].get("content"))
 
         self.assertEqual(messages[1].get("role"), "user")
         self.assertEqual(messages[1].get("content")[0].get("text"), "test history predict")
-        self.assertEqual(messages[2].get("role"), "user")
-        self.assertEqual(messages[2].get("content")[0].get("text"), "Write an email")
 
     def test_predict_callback(self):
         from frappe_cadence.utils.sift import predict_callback
