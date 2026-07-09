@@ -97,6 +97,7 @@ class TestAgentUtils(IntegrationTestCase):
         # Explicit teardown for hardcoded entities as a fallback
         frappe.db.delete("Multi Channel Cadence", {"cadence_name": "_Test Master Cadence"})
         frappe.db.delete("Cadence", {"cadence_name": "_Test Master Cadence"})
+        frappe.db.commit()
         
         super().tearDownClass()
 

@@ -43,7 +43,10 @@ required_apps = ["frappe_controller", "frappe_playbook", "crm"]
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-doctype_js = {"Email Template": "public/js/email_template.js"}
+doctype_js = {
+	"Email Template": "public/js/email_template.js",
+	"User": "cadence/doctype/user/user.js"
+}
 doctype_list_js = {"Communication" : "cadence/doctype/communication/communication_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -153,6 +156,9 @@ doc_events = {
 	},
 	"Playbook Execution": {
 		"on_update": "frappe_cadence.cadence.doctype.playbook_execution.playbook_execution.on_update"
+	},
+	"User": {
+		"validate": "frappe_cadence.cadence.doctype.user.user.validate_bio"
 	}
 }
 
