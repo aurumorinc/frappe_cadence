@@ -94,8 +94,6 @@ class TestMultiChannelCadence(UnitTestCase):
         
         mock_template = MagicMock()
         mock_template.status = "Prompt"
-        mock_template.system_prompt = "You are an assistant"
-        mock_template.user_prompt = "Write an email"
         
         mock_lead = MagicMock()
         mock_lead.name = "LEAD-001"
@@ -182,10 +180,10 @@ class TestMultiChannelCadence(UnitTestCase):
                     
                     # Verify input payload structure
                     input_data = data["input"]
-                    self.assertEqual(len(input_data), 3) # System, History, User
+                    self.assertEqual(len(input_data), 2) # System, History
                     
                     self.assertEqual(input_data[0]["role"], "system")
-                    self.assertIn("You are an assistant", input_data[0]["content"])
+                    self.assertIn("Test User", input_data[0]["content"])
                     
                     self.assertEqual(input_data[1]["role"], "user")
                     self.assertEqual(len(input_data[1]["content"]), 2) # text + image
@@ -193,10 +191,6 @@ class TestMultiChannelCadence(UnitTestCase):
                     self.assertEqual(input_data[1]["content"][0]["text"], "Test History")
                     self.assertEqual(input_data[1]["content"][1]["type"], "image_url")
                     self.assertEqual(input_data[1]["content"][1]["image_url"]["url"], "https://s3.example.com/test.png?sig=123")
-                    
-                    self.assertEqual(input_data[2]["role"], "user")
-                    self.assertEqual(input_data[2]["content"][0]["type"], "text")
-                    self.assertEqual(input_data[2]["content"][0]["text"], "Write an email")
                     
                     mock_wait_for_event.assert_called_once_with(
                         "callback",
@@ -234,8 +228,6 @@ class TestMultiChannelCadence(UnitTestCase):
         
         mock_template = MagicMock()
         mock_template.status = "Prompt"
-        mock_template.system_prompt = "You are an assistant"
-        mock_template.user_prompt = "Write an email"
         
         mock_lead = MagicMock()
         mock_lead.name = "LEAD-002"

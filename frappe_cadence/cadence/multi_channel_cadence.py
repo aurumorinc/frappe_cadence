@@ -150,12 +150,6 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
                         }
                     }
                 },
-                "input": [
-                    {
-                        "role": "system",
-                        "content": getattr(template, "system_prompt", "")
-                    }
-                ]
             }
             
             from markdownify import markdownify
@@ -164,7 +158,12 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
             sender_name = sender.get("full_name") or ""
             sender_bio = markdownify(sender.get("bio") or "")
             
-            payload["input"][0]["content"] += f"\n\nSender Name: {sender_name}\nSender Bio:\n{sender_bio}"
+            payload["input"] = []
+            if sender_name or sender_bio:
+                payload["input"].append({
+                    "role": "system",
+                    "content": f"Sender Name: {sender_name}\nSender Bio:\n{sender_bio}"
+                })
             
             for history in histories:
                 content_blocks = []
@@ -191,11 +190,6 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
                 if content_blocks:
                     payload["input"].append({"role": "user", "content": content_blocks})
 
-            payload["input"].append({
-                "role": "user",
-                "content": [{"type": "text", "text": getattr(template, "user_prompt", "")}]
-            })
-            
             # Use /responses endpoint instead of /agents and map cadence model
             payload["model"] = cadence.sift_id or "default-model"
             
