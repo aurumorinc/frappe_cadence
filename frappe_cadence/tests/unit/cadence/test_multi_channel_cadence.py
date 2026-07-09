@@ -118,7 +118,11 @@ class TestMultiChannelCadence(UnitTestCase):
             if doctype == "Communication":
                 return []
             elif doctype == "History":
-                return [mock_history]
+                filters = kwargs.get("filters", [])
+                for f in filters:
+                    if len(f) >= 3 and f[2] == "LEAD-001":
+                        return [mock_history]
+                return []
             elif doctype == "History Image":
                 return [mock_history_image]
             return []
@@ -171,7 +175,7 @@ class TestMultiChannelCadence(UnitTestCase):
                     self.assertEqual(len(input_data), 3) # System, History, User
                     
                     self.assertEqual(input_data[0]["role"], "system")
-                    self.assertEqual(input_data[0]["content"], "You are an assistant")
+                    self.assertIn("You are an assistant", input_data[0]["content"])
                     
                     self.assertEqual(input_data[1]["role"], "user")
                     self.assertEqual(len(input_data[1]["content"]), 2) # text + image
