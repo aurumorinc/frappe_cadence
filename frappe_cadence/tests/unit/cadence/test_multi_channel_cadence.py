@@ -71,9 +71,7 @@ class TestMultiChannelCadence(UnitTestCase):
         mock_get_value.return_value = {"full_name": "Mock User", "bio": "Mock Bio"}
         mock_get_url.return_value = "http://test.com/webhook"
         from frappe_cadence.cadence.multi_channel_cadence import process_cadence_step
-        
-        # Mock get_all to return empty for idempotency check and draft comm check
-        mock_get_all.return_value = []
+        import json
         
         # Setup Sift settings
         mock_sift_settings = MagicMock()
@@ -88,6 +86,7 @@ class TestMultiChannelCadence(UnitTestCase):
         mock_mcc = MagicMock()
         mock_mcc.cadence_for = "CRM Lead"
         mock_mcc.recipient = "LEAD-001"
+        mock_mcc.sift_id = "agent-mcc"
         row = MagicMock()
         row.channel = "Email"
         row.reference_cadence_provider = "Apollo"
@@ -105,6 +104,28 @@ class TestMultiChannelCadence(UnitTestCase):
         mock_comm = MagicMock()
         mock_comm.name = "COMM-001"
         
+        mock_history = MagicMock()
+        mock_history.content = "Test History"
+        mock_history.name = "HIST-001"
+        
+        mock_history_image = MagicMock()
+        mock_history_image.image = "/files/test.png"
+        
+        mock_file = MagicMock()
+        mock_file.presigned_url = "https://s3.example.com/test.png?sig=123"
+        
+        # Mock get_all
+        def get_all_side_effect(doctype, *args, **kwargs):
+            if doctype == "Communication":
+                return []
+            elif doctype == "History":
+                return [mock_history]
+            elif doctype == "History Image":
+                return [mock_history_image]
+            return []
+            
+        mock_get_all.side_effect = get_all_side_effect
+        
         original_get_doc = frappe.get_doc
         def get_doc_side_effect(*args, **kwargs):
             if len(args) == 2 and args[0] == "Cadence Multi Channel Schedule":
@@ -115,6 +136,8 @@ class TestMultiChannelCadence(UnitTestCase):
                 return mock_template
             elif len(args) == 2 and args[0] == "CRM Lead":
                 return mock_lead
+            elif len(args) == 2 and args[0] == "File":
+                return mock_file
             elif len(args) == 1 and isinstance(args[0], dict) and args[0].get("doctype") == "Communication":
                 return mock_comm
             return original_get_doc(*args, **kwargs)
@@ -134,14 +157,33 @@ class TestMultiChannelCadence(UnitTestCase):
                     # Assert
                     mock_post.assert_called_once()
                     called_url = mock_post.call_args[0][0]
-                    self.assertEqual(called_url, "https://api.sift.com/agents")
+                    self.assertEqual(called_url, "https://api.sift.com/responses")
                     
                     headers = mock_post.call_args[1]["headers"]
                     self.assertEqual(headers["Authorization"], "Bearer sift_secret_key")
                     
-                    data = mock_post.call_args[1]["data"]
-                    self.assertIn("webhook_url", data)
-                    self.assertIn("http://test.com/webhook", data)
+                    data = json.loads(mock_post.call_args[1]["data"])
+                    self.assertIn("webhook_url", data["metadata"])
+                    self.assertEqual(data["metadata"]["webhook_url"], "http://test.com/webhook")
+                    self.assertEqual(data["model"], "agent-mcc")
+                    
+                    # Verify input payload structure
+                    input_data = data["input"]
+                    self.assertEqual(len(input_data), 3) # System, History, User
+                    
+                    self.assertEqual(input_data[0]["role"], "system")
+                    self.assertEqual(input_data[0]["content"], "You are an assistant")
+                    
+                    self.assertEqual(input_data[1]["role"], "user")
+                    self.assertEqual(len(input_data[1]["content"]), 2) # text + image
+                    self.assertEqual(input_data[1]["content"][0]["type"], "text")
+                    self.assertEqual(input_data[1]["content"][0]["text"], "Test History")
+                    self.assertEqual(input_data[1]["content"][1]["type"], "image_url")
+                    self.assertEqual(input_data[1]["content"][1]["image_url"]["url"], "https://s3.example.com/test.png?sig=123")
+                    
+                    self.assertEqual(input_data[2]["role"], "user")
+                    self.assertEqual(input_data[2]["content"][0]["type"], "text")
+                    self.assertEqual(input_data[2]["content"][0]["text"], "Write an email")
                     
                     mock_wait_for_event.assert_called_once_with(
                         "callback",

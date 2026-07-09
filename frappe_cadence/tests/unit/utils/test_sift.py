@@ -93,8 +93,9 @@ class TestSiftUtils(IntegrationTestCase):
         
         super().tearDownClass()
 
+    @patch("frappe_cadence.utils.sift.get_history")
     @patch("frappe_cadence.utils.sift.requests.post")
-    def test_optimize(self, mock_post):
+    def test_optimize(self, mock_post, mock_get_history):
         mock_response = MagicMock()
         mock_response.raise_for_status.return_value = None
         mock_post.return_value = mock_response
@@ -160,8 +161,9 @@ class TestSiftUtils(IntegrationTestCase):
         self.assertEqual(self.template.sift_id, "sift-agent-123")
         self.assertEqual(self.template.status, "Disabled")
 
+    @patch("frappe_cadence.utils.sift.get_history")
     @patch("frappe_cadence.utils.sift.requests.post")
-    def test_predict(self, mock_post):
+    def test_predict(self, mock_post, mock_get_history):
         mock_response = MagicMock()
         mock_response.raise_for_status.return_value = None
         mock_post.return_value = mock_response

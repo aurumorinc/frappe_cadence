@@ -9,11 +9,11 @@ def get_sift_settings() -> tuple:
         frappe.throw("Sift Base URL and API Key must be configured in Sift Settings.")
     return settings.sift_base_url.rstrip('/'), settings.get_password('sift_api_key')
 
-def get_history_content(reference_doctype: str, reference_name: str) -> str:
+def get_history(reference_doctype: str, reference_name: str) -> list:
     histories = frappe.get_all(
         "History",
         filters={"reference_doctype": reference_doctype, "reference_name": reference_name},
-        fields=["content"],
+        fields=["name", "content"],
         order_by="creation asc"
     )
     return "\n\n".join([markdownify(h.content) for h in histories if h.content])
@@ -22,12 +22,22 @@ def get_history_content(reference_doctype: str, reference_name: str) -> str:
 def optimize(template_doctype: str, template_name: str) -> None:
     template = frappe.get_doc(template_doctype, template_name)
     
+    if not template.model:
+        frappe.throw(f"No LLM Model linked to {template_doctype} {template_name}.")
+    
+    model_doc = frappe.get_doc("Model", template.model)
+    
+    if model_doc.provider and "/" not in model_doc.model_name:
+        model_str = f"{model_doc.provider.lower()}/{model_doc.model_name}"
+    else:
+        model_str = model_doc.model_name
+    
     template.db_set("status", "Optimizing")
     
     base_url, api_key = get_sift_settings()
     
     annotations = template.get("annotations", [])
-    few_shot_examples = []
+    train_data = []
     
     for ann in annotations:
         if getattr(ann, "output", None):
@@ -52,13 +62,21 @@ def optimize(template_doctype: str, template_name: str) -> None:
             few_shot_examples.append(example)
             
     payload = {
-        "system_prompt": template.system_prompt,
-        "user_prompt": template.user_prompt,
-        "few_shot_examples": few_shot_examples,
+        "agent_name": f"agent-{template_name}",
         "webhook_url": f"{frappe.utils.get_url()}/api/method/frappe_cadence.utils.sift.optimize_callback",
         "metadata": {
             "template_doctype": template_doctype,
             "template_name": template_name
+        },
+        "litellm_params": {
+            "model": model_str
+        },
+        "dspy_params": {
+            "state": {
+                "default": {
+                    "train": train_data
+                }
+            }
         }
     }
     
@@ -123,7 +141,11 @@ def predict(template_doctype: str, template_name: str) -> None:
     for ann in annotations:
         if not getattr(ann, "output", None):
             has_pending = True
-            history_context = get_history_content(ann.reference_doctype, ann.reference_name)
+            
+            messages = [{"role": "system", "content": template.system_prompt}]
+            history_messages = get_history(ann.reference_doctype, ann.reference_name)
+            messages.extend(history_messages)
+            messages.append({"role": "user", "content": [{"type": "text", "text": ann.input}]})
             
             sender_name = ""
             sender_bio = ""
@@ -143,7 +165,8 @@ def predict(template_doctype: str, template_name: str) -> None:
                 "webhook_url": webhook_url,
                 "metadata": {
                     "annotation_id": ann.name
-                }
+                },
+                "input": messages
             }
             
             try:

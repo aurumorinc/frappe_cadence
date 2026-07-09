@@ -214,7 +214,7 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
                     payload_json = json.dumps(payload, separators=(',', ':'))
                     
                     try:
-                        requests.post(f"{sift_base_url}/agents", headers=headers, data=payload_json, timeout=10)
+                        requests.post(f"{sift_base_url}/responses", headers=headers, data=payload_json, timeout=10)
                         frappe.cache().set_value(f"ai_req:{cadence_name}:{schedule_name}", 1, expires_in_sec=86400)
                     except Exception as e:
                         frappe.log_error(title="Agent Error", message=f"Failed to send task to Agent: {str(e)}")
