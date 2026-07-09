@@ -482,9 +482,9 @@ class TestAgentUtils(IntegrationTestCase):
         original_get_value = frappe.db.get_value
         def get_value_side_effect(*args, **kwargs):
             doctype = kwargs.get("doctype") or (args[0] if len(args) > 0 else None)
-            as_dict = kwargs.get("as_dict")
-            if doctype == "User" and as_dict:
-                return {"full_name": "Test User", "bio": "<p>I am a <strong>bold</strong> user.</p>"}
+            fieldname = kwargs.get("fieldname") or (args[2] if len(args) > 2 else None)
+            if doctype == "User" and isinstance(fieldname, list) and "bio" in fieldname:
+                return frappe._dict(name="user@test.com", full_name="Test User", bio="<p>I am a <strong>bold</strong> user.</p>")
             return original_get_value(*args, **kwargs)
             
         with patch.object(frappe.db, "get_value", side_effect=get_value_side_effect):
