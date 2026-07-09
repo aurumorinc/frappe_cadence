@@ -39,6 +39,7 @@ class TestSiftIntegration(IntegrationTestCase):
         # 4. Create an Email Template
         template = frappe.get_doc({
             "doctype": "Email Template",
+            "name": "Sift Test Template",
             "title": "Sift Test Template",
             "subject": "Test Subject",
             "model": model.name,
@@ -50,6 +51,7 @@ class TestSiftIntegration(IntegrationTestCase):
         lead = frappe.get_doc({
             "doctype": "CRM Lead",
             "lead_name": "Sift Lead",
+            "first_name": "Sift",
             "email_id": "sift_lead@example.com"
         })
         lead.insert(ignore_permissions=True)
@@ -58,6 +60,7 @@ class TestSiftIntegration(IntegrationTestCase):
             "doctype": "History",
             "reference_doctype": "CRM Lead",
             "reference_name": lead.name,
+            "url": "http://test.com",
             "content": "<p>History <em>test</em></p>"
         })
         history.insert(ignore_permissions=True)
@@ -86,8 +89,9 @@ class TestSiftIntegration(IntegrationTestCase):
         original_get_value = frappe.db.get_value
         def get_value_side_effect(*args, **kwargs):
             dt = args[0] if args else kwargs.get("doctype")
-            if dt == "User":
-                return {"full_name": "Sift Test", "bio": "<p>This is a <strong>test</strong> bio.</p>"}
+            fieldname = kwargs.get("fieldname") or (args[2] if len(args) > 2 else None)
+            if dt == "User" and fieldname == ["full_name", "bio"]:
+                return frappe._dict(full_name="Sift Test", bio="<p>This is a <strong>test</strong> bio.</p>")
             return original_get_value(*args, **kwargs)
 
         with patch.object(frappe.db, "get_value", side_effect=get_value_side_effect):
