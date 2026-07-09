@@ -7,6 +7,7 @@ import hashlib
 import base64
 from frappe.utils import add_months, today, get_url
 from frappe_controller.utils.controller import wait_for_event, emit_event
+from markdownify import markdownify
 
 def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=None):
     """
@@ -158,13 +159,36 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
                     {
                         "role": "user",
                         "content": [
-                            {"type": "input_text", "text": getattr(template, "user_prompt", "") or (template.annotations[-1].input if getattr(template, "annotations", None) else "")}
+                            {"type": "input_text", "text": getattr(template, "user_prompt", "")}
                         ]
                     }
                 ]
             }
             
+            sender = frappe.db.get_value("User", mcc.owner, ["full_name", "bio"], as_dict=True) or {}
+            sender_name = sender.get("full_name", "")
+            sender_bio = sender.get("bio", "")
+            if sender_bio:
+                sender_bio = markdownify(sender_bio)
+                
+            sender_info = ""
+            if sender_name:
+                sender_info += f"Sender Name: {sender_name}\n"
+            if sender_bio:
+                sender_info += f"Sender Bio:\n{sender_bio}\n"
+            
+            if sender_info:
+                payload["input"][0]["content"].append({
+                    "type": "input_text",
+                    "text": "\n\n" + sender_info
+                })
+            
             for history in histories:
+                if history.content:
+                    payload["input"][1]["content"].append({
+                        "type": "input_text",
+                        "text": markdownify(history.content)
+                    })
                 if history.image:
                     payload["input"][1]["content"].append({
                         "type": "input_image",
