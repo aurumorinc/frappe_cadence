@@ -7,7 +7,7 @@
  "field_order": [
   "reference_doctype",
   "reference_name",
-  "sender",
+  "input",
   "output",
   "score",
   "feedback"
@@ -28,10 +28,9 @@
    "in_list_view": 1
   },
   {
-   "fieldname": "sender",
-   "fieldtype": "Link",
-   "label": "Sender",
-   "options": "User"
+   "fieldname": "input",
+   "fieldtype": "Text Editor",
+   "label": "Input"
   },
   {
    "fieldname": "output",

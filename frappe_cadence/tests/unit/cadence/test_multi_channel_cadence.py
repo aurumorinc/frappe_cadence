@@ -65,11 +65,10 @@ class TestMultiChannelCadence(UnitTestCase):
     @patch("frappe_cadence.cadence.multi_channel_cadence.wait_for_event")
     @patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_all")
     @patch("frappe_cadence.cadence.multi_channel_cadence.get_url")
-    @patch("frappe_cadence.cadence.multi_channel_cadence.today", return_value="2026-01-01")
-    @patch("frappe_cadence.cadence.multi_channel_cadence.frappe.db.get_value")
-    def test_process_cadence_step_sift_integration(self, mock_get_value, mock_today, mock_get_url, mock_get_all, mock_wait_for_event, mock_post):
-        mock_get_value.return_value = {"full_name": "Mock User", "bio": "Mock Bio"}
+    @patch("frappe_cadence.cadence.multi_channel_cadence.add_months")
+    def test_process_cadence_step_sift_integration(self, mock_add_months, mock_get_url, mock_get_all, mock_wait_for_event, mock_post):
         mock_get_url.return_value = "http://test.com/webhook"
+        mock_add_months.return_value = "2024-01-01"
         from frappe_cadence.cadence.multi_channel_cadence import process_cadence_step
         import json
         
