@@ -16,16 +16,6 @@ class TestSiftIntegration(IntegrationTestCase):
 
     @patch("frappe_cadence.utils.sift.requests.post")
     def test_optimize_payload_formatting(self, mock_post):
-        # 1. Create a User with an HTML bio
-        user = frappe.get_doc({
-            "doctype": "User",
-            "email": "sift_test_user@example.com",
-            "first_name": "Sift",
-            "last_name": "Test",
-            "bio": "<p>This is a <strong>test</strong> bio.</p>"
-        })
-        user.insert(ignore_permissions=True, ignore_if_duplicate=True)
-
         # 2. Create Sift Settings
         settings = frappe.get_single("Sift Settings")
         settings.sift_base_url = "https://api.sift.com"
@@ -80,7 +70,7 @@ class TestSiftIntegration(IntegrationTestCase):
             "parenttype": "Email Template",
             "reference_doctype": "CRM Lead",
             "reference_name": lead.name,
-            "sender": user.name,
+            "sender": "sift_test_user@example.com",
             "output": "Expected Output"
         })
         annotation.insert(ignore_permissions=True)
@@ -93,7 +83,15 @@ class TestSiftIntegration(IntegrationTestCase):
         mock_response.raise_for_status.return_value = None
         mock_post.return_value = mock_response
 
-        optimize(template.doctype, template.name)
+        original_get_value = frappe.db.get_value
+        def get_value_side_effect(*args, **kwargs):
+            dt = args[0] if args else kwargs.get("doctype")
+            if dt == "User":
+                return {"full_name": "Sift Test", "bio": "<p>This is a <strong>test</strong> bio.</p>"}
+            return original_get_value(*args, **kwargs)
+
+        with patch.object(frappe.db, "get_value", side_effect=get_value_side_effect):
+            optimize(template.doctype, template.name)
 
         # 8. Assertions
         mock_post.assert_called_once()
