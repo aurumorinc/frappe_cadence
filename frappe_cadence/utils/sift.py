@@ -17,10 +17,11 @@ def get_history(reference_doctype: str, reference_name: str) -> list:
     )
     
     messages = []
+    from markdownify import markdownify
     for h in histories:
         content_blocks = []
         if h.content:
-            content_blocks.append({"type": "text", "text": h.content})
+            content_blocks.append({"type": "text", "text": markdownify(h.content)})
             
         history_images = frappe.get_all(
             "History Image",
@@ -65,14 +66,21 @@ def optimize(template_doctype: str, template_name: str) -> None:
     annotations = template.get("annotations", [])
     train_data = []
     
+    from markdownify import markdownify
     for ann in annotations:
-        if ann.input and ann.output:
+        if ann.output:
             messages = [{"role": "system", "content": template.system_prompt}]
             
+            sender = frappe.db.get_value("User", getattr(ann, "sender", None), ["full_name", "bio"], as_dict=True) if getattr(ann, "sender", None) else {}
+            sender_name = sender.get("full_name") or ""
+            sender_bio = markdownify(sender.get("bio") or "")
+            if sender_name or sender_bio:
+                messages[0]["content"] += f"\n\nSender Name: {sender_name}\nSender Bio:\n{sender_bio}"
+
             history_messages = get_history(ann.reference_doctype, ann.reference_name)
             messages.extend(history_messages)
             
-            messages.append({"role": "user", "content": [{"type": "text", "text": ann.input}]})
+            messages.append({"role": "user", "content": [{"type": "text", "text": template.user_prompt}]})
             
             train_data.append({
                 "trace_id": ann.name,
@@ -158,14 +166,22 @@ def predict(template_doctype: str, template_name: str) -> None:
     
     has_pending = False
     
+    from markdownify import markdownify
     for ann in annotations:
         if not ann.output:
             has_pending = True
             
             messages = [{"role": "system", "content": template.system_prompt}]
+            
+            sender = frappe.db.get_value("User", getattr(ann, "sender", None), ["full_name", "bio"], as_dict=True) if getattr(ann, "sender", None) else {}
+            sender_name = sender.get("full_name") or ""
+            sender_bio = markdownify(sender.get("bio") or "")
+            if sender_name or sender_bio:
+                messages[0]["content"] += f"\n\nSender Name: {sender_name}\nSender Bio:\n{sender_bio}"
+
             history_messages = get_history(ann.reference_doctype, ann.reference_name)
             messages.extend(history_messages)
-            messages.append({"role": "user", "content": [{"type": "text", "text": ann.input}]})
+            messages.append({"role": "user", "content": [{"type": "text", "text": template.user_prompt}]})
             
             payload = {
                 "model": template.sift_id,
