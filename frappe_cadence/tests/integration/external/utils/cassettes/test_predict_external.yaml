@@ -1,0 +1,67 @@
+interactions:
+- request:
+    body: '{"model": "sift-agent-external-123", "background": true, "webhook": {"url":
+      "http://crm-dev.aurumor.com:8000/api/method/frappe_cadence.utils.sift.predict_callback",
+      "metadata": {"annotation_id": "5ue6l9p6c6", "annotation_doctype": "Email Template
+      Annotation"}}, "input": [{"role": "system", "content": "Sender Name: Administrator\nSender
+      Bio:\n"}], "response_format": {"type": "json_schema", "json_schema": {"name":
+      "EmailTemplateAnnotation", "schema": {"type": "object", "properties": {"subject":
+      {"type": "string", "description": "Subject"}, "salutation": {"type": "string",
+      "description": "Salutation"}, "body": {"type": "string", "description": "Body"},
+      "cta": {"type": "string", "description": "CTA"}, "sign_off": {"type": "string",
+      "description": "Sign Off"}}, "required": ["subject", "salutation", "body", "cta",
+      "sign_off"]}}}}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, br, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '835'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.34.2
+    method: POST
+    uri: https://windmill.aurumor.com/api/w/aurumor/jobs/run/p/f/sift/responses
+  response:
+    body:
+      string: 019f4bdb-4d15-0124-ef70-c7df7452ac8d
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Alt-Svc:
+      - h3=":443"; ma=86400
+      CF-RAY:
+      - a18f568178ca4192-BOM
+      Cf-Cache-Status:
+      - DYNAMIC
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '36'
+      Content-Type:
+      - text/plain; charset=utf-8
+      Date:
+      - Fri, 10 Jul 2026 11:48:11 GMT
+      Nel:
+      - '{"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}'
+      Report-To:
+      - '{"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=97csxd729jLuitlT8D4XtuQLgiolhiO2OsFnCAOSot5aPNt7gwuLnSLNufBdXU8Inaed5wr5lOci3BXrvKfEeVSo1UFaVgojBQXxcNShbKjMDNeg63IymGG64d%2B6ek5H6UGiMW%2F9mQ%3D%3D"}]}'
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - GAESA=CrABMDAxNTQ4ZjcyOWI1OThlNmNkMDFlYzQ0Y2ZlMTI5ODgxODMwNzBlOTU1ODlhNjRhZDkyNmZhYmIxNmYzMDQ0OGI1ZDRjYTFmMjFkZGU4OWJlZDM0MTg4NDFhOGI1ZDg4ZWUwOGNiODg0MzQ3Yzc5NWU4YTcyMTVmN2RhMDQzNWNhZWQxNTk5NTFkZDE0YjgzMjZjZmUyMWJkMTU5ZDNkNzM0ZjhkMjFmNDkyOTRkODEQqJrt3vQz;
+        expires=Sun, 09-Aug-2026 11:48:11 GMT; path=/
+      Vary:
+      - origin, access-control-request-method, access-control-request-headers
+      Via:
+      - 1.1 google
+      X-Cloud-Trace-Context:
+      - d8062db812a5e375d105a968fcb32deb
+    status:
+      code: 201
+      message: Created
+version: 1
