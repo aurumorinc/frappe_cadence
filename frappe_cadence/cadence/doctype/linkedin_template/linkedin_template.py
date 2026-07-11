@@ -2,6 +2,23 @@ import frappe
 from frappe.model.document import Document
 
 class LinkedInTemplate(Document):
+    # begin: auto-generated types
+    # This code is auto-generated. Do not modify anything in this block.
+
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        from frappe.types import DF
+        from frappe_cadence.cadence.doctype.linkedin_template_annotation.linkedin_template_annotation import LinkedinTemplateAnnotation
+
+        annotations: DF.Table[LinkedinTemplateAnnotation]
+        linkedin_template_code: DF.Data | None
+        message: DF.TextEditor | None
+        sift_id: DF.Data | None
+        status: DF.Literal["Enabled", "Prompt", "Disabled"]
+        title: DF.Data
+    # end: auto-generated types
+
     def on_update(self):
         cadences = frappe.get_all("Multi Channel Cadence", filters={"status": ["in", ["Scheduled", "In Progress"]]}, fields=["name", "cadence_name"])
         for camp in cadences:
