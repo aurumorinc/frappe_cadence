@@ -68,7 +68,7 @@ class TestEnrichmentUtils(IntegrationTestCase):
         from frappe_cadence.utils.enrichment import get_crm_leads
         
         results = get_crm_leads(
-            doctype="Annotation",
+            doctype="Email Template Annotation",
             txt="",
             searchfield="name",
             start=0,

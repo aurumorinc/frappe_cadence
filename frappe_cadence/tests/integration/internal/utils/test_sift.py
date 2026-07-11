@@ -2,7 +2,7 @@ import frappe
 import json
 from unittest.mock import patch, MagicMock
 from frappe.tests import IntegrationTestCase
-from frappe_cadence.utils.sift import optimize
+from frappe_cadence.utils.sift import optimize, optimize_callback, predict_callback
 
 class TestSiftIntegration(IntegrationTestCase):
     @classmethod
@@ -40,6 +40,7 @@ class TestSiftIntegration(IntegrationTestCase):
         template = frappe.get_doc({
             "doctype": "Email Template",
             "name": "Sift Test Template",
+            "email_template_code": "agent-sift-test-template",
             "title": "Sift Test Template",
             "subject": "Test Subject",
             "model": model.name,
@@ -67,14 +68,18 @@ class TestSiftIntegration(IntegrationTestCase):
 
         # 6. Create Annotation with Sender
         annotation = frappe.get_doc({
-            "doctype": "Annotation",
+            "doctype": "Email Template Annotation",
             "parent": template.name,
             "parentfield": "annotations",
             "parenttype": "Email Template",
             "reference_doctype": "CRM Lead",
             "reference_name": lead.name,
             "sender": "Administrator",
-            "output": "Expected Output"
+            "subject": "Expected Subject",
+            "salutation": "Expected Salutation",
+            "body": "Expected Body",
+            "cta": "Expected CTA",
+            "sign_off": "Expected Sign Off"
         })
         annotation.insert(ignore_permissions=True)
 
@@ -103,11 +108,11 @@ class TestSiftIntegration(IntegrationTestCase):
         if not payload and "data" in mock_post.call_args[1]:
             payload = json.loads(mock_post.call_args[1]["data"])
             
-        train_data = payload["dspy_params"]["state"]["default"]["train"]
+        train_data = payload["dspy_params"]["state"]["predict"]["train"]
         self.assertEqual(len(train_data), 1)
         
         trace = train_data[0]
-        self.assertEqual(trace["feedback"], "Expected Output")
+        self.assertEqual(trace["response"]["body"], "Expected Body")
         
         messages = trace["messages"]
         self.assertEqual(len(messages), 2) # System, History
@@ -121,7 +126,109 @@ class TestSiftIntegration(IntegrationTestCase):
         history_content = messages[1]["content"]
         self.assertEqual(history_content[0]["text"].strip(), "History *test*") # Markdown converted
 
-        # Cleanup
-        template.delete()
-        history.delete()
-        lead.delete()
+    def test_optimize_callback(self):
+        template = frappe.get_doc({
+            "doctype": "Email Template",
+            "name": "Callback Test Template",
+            "title": "Callback Test Template",
+            "subject": "Test Subject",
+            "status": "Enabled"
+        })
+        template.insert(ignore_permissions=True)
+        template.db_set("status", "Optimizing")
+
+        # Test completed event
+        completed_payload = {
+            "type": "agent.completed",
+            "metadata": {
+                "doctype": template.doctype,
+                "name": template.name
+            },
+            "data": [{"agent_name": "test_agent_123"}]
+        }
+        res = optimize_callback(**completed_payload)
+        self.assertEqual(res.get("status"), "success")
+        
+        template.reload()
+        self.assertEqual(template.sift_id, "test_agent_123")
+        self.assertEqual(template.status, "Disabled")
+
+        # Test failed event
+        failed_payload = {
+            "type": "agent.failed",
+            "metadata": {
+                "doctype": template.doctype,
+                "name": template.name
+            },
+            "error": "Optimization failed"
+        }
+        res = optimize_callback(**failed_payload)
+        self.assertEqual(res.get("status"), "failed")
+        
+        template.reload()
+        self.assertEqual(template.status, "Enabled")
+
+    def test_predict_callback(self):
+        template = frappe.get_doc({
+            "doctype": "Email Template",
+            "name": "Predict Callback Test Template",
+            "title": "Predict Callback Test Template",
+            "subject": "Test Subject",
+            "status": "Enabled"
+        })
+        template.insert(ignore_permissions=True)
+        template.db_set("status", "Predicting")
+
+        lead = frappe.get_doc({
+            "doctype": "CRM Lead",
+            "lead_name": "Sift Predict Lead",
+            "first_name": "Sift",
+        })
+        lead.insert(ignore_permissions=True)
+
+        annotation = frappe.get_doc({
+            "doctype": "Email Template Annotation",
+            "parent": template.name,
+            "parentfield": "annotations",
+            "parenttype": "Email Template",
+            "reference_doctype": "CRM Lead",
+            "reference_name": lead.name,
+        })
+        annotation.insert(ignore_permissions=True)
+
+        # Test started event
+        started_payload = {
+            "type": "response.started",
+            "metadata": {
+                "name": annotation.name,
+                "doctype": annotation.doctype
+            }
+        }
+        res = predict_callback(**started_payload)
+        self.assertEqual(res.get("status"), "ignored")
+
+        # Test completed event
+        completed_payload = {
+            "type": "response.completed",
+            "metadata": {
+                "name": annotation.name,
+                "doctype": annotation.doctype
+            },
+            "data": [
+                    {
+                        "content": [
+                            {
+                                "type": "output_text",
+                                "text": '{"subject": "Predicted Subject", "body": "Predicted Body"}'
+                            }
+                        ]
+                    }
+                ]
+        }
+        res = predict_callback(**completed_payload)
+        self.assertEqual(res.get("status"), "success")
+        
+        annotation.reload()
+        self.assertEqual(annotation.subject, "Predicted Subject")
+        self.assertEqual(annotation.body, "Predicted Body")
+

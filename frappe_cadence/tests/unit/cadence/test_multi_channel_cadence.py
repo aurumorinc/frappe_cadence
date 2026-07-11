@@ -174,8 +174,10 @@ class TestMultiChannelCadence(UnitTestCase):
                     self.assertEqual(headers["Authorization"], "Bearer sift_secret_key")
                     
                     data = json.loads(mock_post.call_args[1]["data"])
-                    self.assertIn("webhook_url", data["metadata"])
-                    self.assertEqual(data["metadata"]["webhook_url"], "http://test.com/webhook")
+                    self.assertTrue(data.get("background"))
+                    self.assertIn("webhook", data)
+                    self.assertEqual(data["webhook"]["url"], "http://test.com/webhook")
+                    self.assertEqual(data["webhook"]["events"], ["completed", "failed"])
                     self.assertEqual(data["model"], "agent-mcc")
                     
                     # Verify input payload structure
