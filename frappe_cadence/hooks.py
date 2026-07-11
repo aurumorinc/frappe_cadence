@@ -44,7 +44,7 @@ required_apps = ["frappe_controller", "frappe_playbook", "crm"]
 
 # include js in doctype views
 doctype_js = {
-    "Email Template": "public/js/email_template.js",
+    "Email Template": "cadence/doctype/email_template/email_template.js",
     "User": "cadence/doctype/user/user.js"
 }
 doctype_list_js = {"Communication" : "cadence/doctype/communication/communication_list.js"}
