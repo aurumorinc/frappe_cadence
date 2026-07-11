@@ -207,7 +207,11 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
                     
                     # Add webhook info to payload so Sift knows where to callback
                     webhook_url = get_url(f"/api/method/frappe_cadence.cadence.{channel.lower()}_template.callback")
-                    payload["metadata"]["webhook_url"] = webhook_url
+                    payload["background"] = True
+                    payload["webhook"] = {
+                        "url": webhook_url,
+                        "events": ["completed", "failed"]
+                    }
 
                     payload_json = json.dumps(payload, separators=(',', ':'))
                     
