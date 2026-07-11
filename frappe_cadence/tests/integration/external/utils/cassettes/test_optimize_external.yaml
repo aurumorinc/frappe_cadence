@@ -1,0 +1,64 @@
+interactions:
+- request:
+    body: '{"agent_name": "agent-External Test Template", "webhook": {"url": "http://crm-dev.aurumor.com:8000/api/method/frappe_cadence.utils.sift.optimize_callback",
+      "events": ["completed", "failed"], "metadata": {"template_doctype": "Email Template",
+      "template_name": "External Test Template"}}, "litellm_params": {"model": "testprovider/test-model"},
+      "dspy_params": {"state": {"predict": {"train": [{"trace_id": "5uce4sf7fa", "score":
+      0.0, "messages": [{"role": "system", "content": "Sender Name: Administrator\nSender
+      Bio:\n"}], "response": {"subject": "External Subject", "salutation": "External
+      Salutation", "body": "External Body", "cta": "External CTA", "sign_off": "External
+      Sign Off"}, "feedback": null}]}}}}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate, br, zstd
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '707'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - python-requests/2.34.2
+    method: POST
+    uri: https://windmill.aurumor.com/api/w/aurumor/jobs/run/p/f/sift/agents
+  response:
+    body:
+      string: 019f4bdb-4c67-78b9-724e-d5aad405bcaf
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Alt-Svc:
+      - h3=":443"; ma=86400
+      CF-RAY:
+      - a18f56806958a7b7-BOM
+      Cf-Cache-Status:
+      - DYNAMIC
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '36'
+      Content-Type:
+      - text/plain; charset=utf-8
+      Date:
+      - Fri, 10 Jul 2026 11:48:10 GMT
+      Nel:
+      - '{"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}'
+      Report-To:
+      - '{"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=qBjWRCsjcdWQfEr%2Brd6GNBimNVn8AGCXcHNHcpFpVxPNHH1zRgtyAlWDW%2FOGFiuRb0fm2gbM6ONJf2tHVd0NhI%2B9KbxAVLGY%2Bx4LOrUBCb%2FqBr0GYTmwe8YXOS7PUqVMg39y%2FsWyyw%3D%3D"}]}'
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - GAESA=CrABMDAxNTQ4ZjcyOWI1OThlNmNkMDFlYzQ0Y2ZlMTI5ODgxODMwNzBlOTU1ODlhNjRhZDkyNmZhYmIxNmYzMDQ0OGI1ZDRjYTFmMjFkZGU4OWJlZDM0MTg4NDFhOGI1ZDg4ZWUwOGNiODg0MzQ3Yzc5NWU4YTcyMTVmN2RhMDQzNWNhZWQxNTk5NTFkZDE0YjgzMjZjZmUyMWJkMTU5ZDNkNzM0ZjhkMjFmNDkyOTRkODEQ_Jjt3vQz;
+        expires=Sun, 09-Aug-2026 11:48:11 GMT; path=/
+      Vary:
+      - origin, access-control-request-method, access-control-request-headers
+      Via:
+      - 1.1 google
+      X-Cloud-Trace-Context:
+      - c40d2cf864d287ddf9219baa0698d592
+    status:
+      code: 201
+      message: Created
+version: 1

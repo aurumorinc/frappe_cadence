@@ -1,24 +1,31 @@
 {
  "actions": [],
  "autoname": "field:title",
- "creation": "2024-05-17 12:00:00.000000",
+ "creation": "2024-05-17 12:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
- "field_order": [
-  "title",
-  "status",
-  "message",
-  "annotations",
-  "sift_id"
- ],
- "fields": [
-  {
-   "fieldname": "title",
-   "fieldtype": "Data",
-   "label": "Title",
-   "reqd": 1,
-   "unique": 1
-  },
+  "field_order": [
+   "title",
+   "linkedin_template_code",
+   "status",
+   "message",
+   "annotations",
+   "sift_id"
+  ],
+  "fields": [
+   {
+    "fieldname": "title",
+    "fieldtype": "Data",
+    "in_list_view": 1,
+    "label": "Title",
+    "reqd": 1,
+    "unique": 1
+   },
+   {
+    "fieldname": "linkedin_template_code",
+    "fieldtype": "Data",
+    "label": "LinkedIn Template Code"
+   },
   {
    "default": "Enabled",
    "fieldname": "status",
@@ -35,7 +42,7 @@
    "fieldname": "annotations",
    "fieldtype": "Table",
    "label": "Annotations",
-   "options": "Annotation"
+   "options": "Linkedin Template Annotation"
   },
   {
    "fieldname": "sift_id",
@@ -45,7 +52,7 @@
   }
  ],
  "links": [],
- "modified": "2024-05-17 12:00:00.000000",
+ "modified": "2026-07-10 02:55:03.128093",
  "modified_by": "Administrator",
  "module": "Cadence",
  "name": "LinkedIn Template",
@@ -64,6 +71,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],

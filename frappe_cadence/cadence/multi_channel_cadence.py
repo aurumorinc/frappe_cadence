@@ -150,18 +150,25 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
                         }
                     }
                 },
-                "input": [
-                    {
-                        "role": "system",
-                        "content": getattr(template, "system_prompt", "")
-                    }
-                ]
             }
+            
+            from markdownify import markdownify
+            
+            sender = frappe.db.get_value("User", mcc.owner, ["full_name", "bio"], as_dict=True) or {}
+            sender_name = sender.get("full_name") or ""
+            sender_bio = markdownify(sender.get("bio") or "")
+            
+            payload["input"] = []
+            if sender_name or sender_bio:
+                payload["input"].append({
+                    "role": "system",
+                    "content": f"Sender Name: {sender_name}\nSender Bio:\n{sender_bio}"
+                })
             
             for history in histories:
                 content_blocks = []
                 if history.content:
-                    content_blocks.append({"type": "text", "text": history.content})
+                    content_blocks.append({"type": "text", "text": markdownify(history.content)})
                     
                 history_images = frappe.get_all(
                     "History Image",
@@ -183,11 +190,6 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
                 if content_blocks:
                     payload["input"].append({"role": "user", "content": content_blocks})
 
-            payload["input"].append({
-                "role": "user",
-                "content": [{"type": "text", "text": getattr(template, "user_prompt", "") or (template.annotations[-1].input if getattr(template, "annotations", None) else "")}]
-            })
-            
             # Use /responses endpoint instead of /agents and map cadence model
             payload["model"] = cadence.sift_id or "default-model"
             
@@ -205,7 +207,11 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
                     
                     # Add webhook info to payload so Sift knows where to callback
                     webhook_url = get_url(f"/api/method/frappe_cadence.cadence.{channel.lower()}_template.callback")
-                    payload["metadata"]["webhook_url"] = webhook_url
+                    payload["background"] = True
+                    payload["webhook"] = {
+                        "url": webhook_url,
+                        "events": ["completed", "failed"]
+                    }
 
                     payload_json = json.dumps(payload, separators=(',', ':'))
                     

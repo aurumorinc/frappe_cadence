@@ -64,7 +64,7 @@ class TestEnrichmentFlow(IntegrationTestCase):
         # 3. Try to get leads for annotation
         from frappe_cadence.utils.enrichment import get_crm_leads
         results = get_crm_leads(
-            doctype="Annotation",
+            doctype="Email Template Annotation",
             txt="",
             searchfield="name",
             start=0,
@@ -82,7 +82,7 @@ class TestEnrichmentFlow(IntegrationTestCase):
         
         # 5. Lead should now appear
         results = get_crm_leads(
-            doctype="Annotation",
+            doctype="Email Template Annotation",
             txt="",
             searchfield="name",
             start=0,

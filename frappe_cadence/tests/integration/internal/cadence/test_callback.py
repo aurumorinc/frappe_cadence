@@ -10,10 +10,11 @@ class TestCallback(IntegrationTestCase):
     def test_callback_emits_event(self, mock_get_doc, mock_emit_event):
         # Mock payload
         frappe.local.request = frappe._dict(json={
+            "type": "response.completed",
             "metadata": {
                 "name": "COMM-001"
             },
-            "output": [
+            "data": [
                 {
                     "content": [
                         {
@@ -57,8 +58,9 @@ class TestCallback(IntegrationTestCase):
 
     def test_callback_invalid_json(self):
         frappe.local.request = frappe._dict(json={
+            "type": "response.completed",
             "metadata": {"name": "COMM-001"},
-            "output": [{"content": [{"text": "invalid json"}]}]
+            "data": [{"content": [{"text": "invalid json"}]}]
         })
         result = callback()
         self.assertEqual(result.get("status"), "error")

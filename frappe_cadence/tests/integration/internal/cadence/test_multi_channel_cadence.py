@@ -478,30 +478,40 @@ class TestAgentUtils(IntegrationTestCase):
         mock_get_all.side_effect = get_all_side_effect
         
         original_get_doc = frappe.get_doc
-        with patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_doc") as mock_get_doc:
-            mock_schedule = frappe._dict(reference_doctype="Email Template", reference_name="Test Email Template")
-            mock_template = frappe._dict(status="Prompt", system_prompt="Sys Prompt", user_prompt="User Prompt", annotations=[frappe._dict(input="")])
-            mock_cadence = frappe._dict(cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_model_123")
-            mock_lead = frappe._dict(name=self.lead_name, organization=None)
+        
+        original_get_value = frappe.db.get_value
+        def get_value_side_effect(*args, **kwargs):
+            doctype = kwargs.get("doctype") or (args[0] if len(args) > 0 else None)
+            fieldname = kwargs.get("fieldname") or (args[2] if len(args) > 2 else None)
+            if doctype == "User" and isinstance(fieldname, list) and "bio" in fieldname:
+                return frappe._dict(name="user@test.com", full_name="Test User", bio="<p>I am a <strong>bold</strong> user.</p>")
+            return original_get_value(*args, **kwargs)
             
-            def side_effect(*args, **kwargs):
-                dt = args[0] if args else kwargs.get("doctype")
-                if dt == "Cadence Multi Channel Schedule": return mock_schedule
-                if dt == "Email Template": return mock_template
-                if dt == "Multi Channel Cadence": return mock_cadence
-                if dt == "CRM Lead": return mock_lead
-                if dt == "File": return file_doc
-                return original_get_doc(*args, **kwargs)
-            mock_get_doc.side_effect = side_effect
-            
-            process_cadence_step(self.cadence_name, self.schedule_name)
+        with patch.object(frappe.db, "get_value", side_effect=get_value_side_effect):
+            with patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_doc") as mock_get_doc:
+                mock_schedule = frappe._dict(reference_doctype="Email Template", reference_name="Test Email Template")
+                mock_template = frappe._dict(status="Prompt", annotations=[frappe._dict(input="")])
+                mock_cadence = frappe._dict(cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_model_123")
+                mock_lead = frappe._dict(name=self.lead_name, organization=None)
+                
+                def side_effect(*args, **kwargs):
+                    dt = args[0] if args else kwargs.get("doctype")
+                    if dt == "Cadence Multi Channel Schedule": return mock_schedule
+                    if dt == "Email Template": return mock_template
+                    if dt == "Multi Channel Cadence": return mock_cadence
+                    if dt == "CRM Lead": return mock_lead
+                    if dt == "File": return file_doc
+                    return original_get_doc(*args, **kwargs)
+                mock_get_doc.side_effect = side_effect
+                
+                process_cadence_step(self.cadence_name, self.schedule_name)
             
         payload = json.loads(mock_post.call_args[1]["data"])
         
         # Assertions for payload format
         self.assertEqual(payload["model"], "test_model_123")
         self.assertEqual(payload["input"][0]["role"], "system")
-        self.assertEqual(payload["input"][0]["content"], "Sys Prompt")
+        self.assertIn("Test User", payload["input"][0]["content"])
         
         history_msg = payload["input"][1]
         self.assertEqual(history_msg["role"], "user")
@@ -511,10 +521,6 @@ class TestAgentUtils(IntegrationTestCase):
         self.assertEqual(history_msg["content"][1]["type"], "image_url")
         self.assertTrue(history_msg["content"][1]["image_url"]["url"].startswith("http"))
         self.assertIn("?sig=", history_msg["content"][1]["image_url"]["url"]) # Ensure presigned URL
-        
-        self.assertEqual(payload["input"][2]["role"], "user")
-        self.assertEqual(payload["input"][2]["content"][0]["type"], "text")
-        self.assertEqual(payload["input"][2]["content"][0]["text"], "User Prompt")
         
         import os
         if os.path.exists(frappe.get_site_path("public", "files", test_file_path)):
