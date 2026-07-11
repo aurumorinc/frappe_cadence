@@ -1,42 +1,43 @@
 {
  "actions": [],
- "creation": "2024-06-11 10:00:00.000000",
- "custom": 1,
+ "allow_rename": 1,
+ "creation": "2026-07-10 02:54:14.067312",
  "doctype": "DocType",
+ "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "output",
   "reference_doctype",
   "reference_name",
   "sender",
-  "output",
   "score",
   "feedback"
  ],
  "fields": [
   {
+   "fieldname": "output",
+   "fieldtype": "Text Editor",
+   "label": "Output"
+  },
+  {
    "fieldname": "reference_doctype",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Reference DocType",
-   "options": "DocType",
-   "in_list_view": 1
+   "options": "DocType"
   },
   {
    "fieldname": "reference_name",
    "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
    "label": "Reference Name",
-   "options": "reference_doctype",
-   "in_list_view": 1
+   "options": "reference_doctype"
   },
   {
    "fieldname": "sender",
    "fieldtype": "Link",
    "label": "Sender",
    "options": "User"
-  },
-  {
-   "fieldname": "output",
-   "fieldtype": "Text Editor",
-   "label": "Output"
   },
   {
    "fieldname": "score",
@@ -49,15 +50,19 @@
    "label": "Feedback"
   }
  ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2024-06-11 10:00:00.000000",
+ "modified": "2026-07-10 02:54:14.448049",
  "modified_by": "Administrator",
  "module": "Cadence",
- "name": "Annotation",
+ "name": "Whatsapp Template Annotation",
  "owner": "Administrator",
  "permissions": [],
- "sort_field": "modified",
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
  "sort_order": "DESC",
  "states": []
 }
