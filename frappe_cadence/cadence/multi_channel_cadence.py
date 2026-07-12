@@ -52,7 +52,7 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
     reference_cadence_provider = None
     for row in (mcc.get("provider") or []):
         if row.channel == channel:
-            reference_cadence_provider = row.reference_cadence_provider
+            reference_cadence_provider = row.cadence_provider
             break
 
     if template.status == "Enabled":

@@ -34,7 +34,7 @@
  "modified": "2026-07-02 20:11:17.402782",
  "modified_by": "Administrator",
  "module": "Cadence",
- "name": "Channel Cadence Provider",
+ "name": "Cadence Provider Channel",
  "owner": "Administrator",
  "permissions": [],
  "row_format": "Dynamic",

@@ -23,7 +23,7 @@ class TestMultiChannelCadence(UnitTestCase):
         mock_mcc = MagicMock()
         row = MagicMock()
         row.channel = "Email"
-        row.reference_cadence_provider = "Apollo"
+        row.cadence_provider = "Apollo"
         mock_mcc.get.return_value = [row]
         
         mock_template = MagicMock()
@@ -89,7 +89,7 @@ class TestMultiChannelCadence(UnitTestCase):
         mock_mcc.sift_id = "agent-mcc"
         row = MagicMock()
         row.channel = "Email"
-        row.reference_cadence_provider = "Apollo"
+        row.cadence_provider = "Apollo"
         mock_mcc.get.return_value = [row]
         
         mock_template = MagicMock()
@@ -225,7 +225,7 @@ class TestMultiChannelCadence(UnitTestCase):
         mock_mcc.sift_id = "agent-mcc-2"
         row = MagicMock()
         row.channel = "Email"
-        row.reference_cadence_provider = "Apollo"
+        row.cadence_provider = "Apollo"
         mock_mcc.get.return_value = [row]
         
         mock_template = MagicMock()

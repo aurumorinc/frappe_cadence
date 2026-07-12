@@ -14,7 +14,7 @@ class Cadence(Document):
 	if TYPE_CHECKING:
 		from frappe.automation.doctype.assignment_rule_user.assignment_rule_user import AssignmentRuleUser
 		from frappe.types import DF
-		from frappe_cadence.cadence.doctype.channel_cadence_provider.channel_cadence_provider import ChannelCadenceProvider
+		from frappe_cadence.cadence.doctype.cadence_provider_channel.cadence_provider_channel import CadenceProviderChannel
 		from frappe_cadence.cadence.doctype.cadence_multi_channel_schedule.cadence_multi_channel_schedule import CadenceMultiChannelSchedule
 
 		assign_condition: DF.Code | None
@@ -22,7 +22,7 @@ class Cadence(Document):
 		cadence_code: DF.Data
 		cadence_name: DF.Data
 		cadence_schedules: DF.Table[CadenceMultiChannelSchedule]
-		provider: DF.Table[ChannelCadenceProvider]
+		provider: DF.Table[CadenceProviderChannel]
 		description: DF.Text | None
 		last_user: DF.Link | None
 		naming_series: DF.Literal["CAD-.YYYY.-"]
@@ -85,7 +85,7 @@ class Cadence(Document):
 						"doctype": "Playbook",
 						"playbook_name": f"{self.name}",
 						"document_type": "Multi Channel Cadence",
-						"doc_event": "Save",
+						"doc_event": "on_update",
 						"condition_type": "Filters",
 						"is_active": 0,
 						"filters": [
@@ -234,7 +234,6 @@ def add_lead_to_cadence(cadence, lead_name):
 		email_cadence.cadence_for = "CRM Lead"
 		email_cadence.recipient = lead_name
 		email_cadence.sender = sender
-		email_cadence.start_date = frappe.utils.nowdate()
 		email_cadence.save(ignore_permissions=True)
 	except Exception as e:
 		frappe.log_error(title="Failed to enroll lead in cadence", message=str(e))
