@@ -10,12 +10,12 @@ class MultiChannelCadence(Document):
 
     if TYPE_CHECKING:
         from frappe.types import DF
-        from frappe_cadence.cadence.doctype.channel_cadence_provider.channel_cadence_provider import ChannelCadenceProvider
+        from frappe_cadence.cadence.doctype.mcc_cadence_provider.mcc_cadence_provider import MCCCadenceProvider
 
         cadence_for: DF.Literal["", "CRM Lead", "Contact", "Email Group"]
         cadence_name: DF.Link
         end_date: DF.Date | None
-        provider: DF.Table[ChannelCadenceProvider]
+        provider: DF.Table[MCCCadenceProvider]
         recipient: DF.DynamicLink
         sender: DF.Link | None
         start_date: DF.Date
@@ -30,11 +30,11 @@ class MultiChannelCadence(Document):
         for channel, provider in resolved.items():
             self.append("provider", {
                 "channel": channel,
-                "reference_cadence_provider": provider
+                "cadence_provider": provider
             })
 
     def after_insert(self):
-        unique_providers = list(set(row.reference_cadence_provider for row in (self.get("provider") or [])))
+        unique_providers = list(set(row.cadence_provider for row in (self.get("provider") or []) if row.cadence_provider))
         for provider in unique_providers:
             enqueue(
                 "frappe_cadence.cadence.doctype.cadence_provider.cadence_provider.broadcast_event",
@@ -48,9 +48,33 @@ class MultiChannelCadence(Document):
     def on_update(self):
         cadence = frappe.get_doc("Cadence", self.cadence_name)
         
+        # Check if providers changed
+        old_doc = self.get_doc_before_save()
+        if old_doc:
+            old_providers = {row.channel: row.cadence_provider for row in (old_doc.get("provider") or []) if row.cadence_provider}
+            current_providers = {row.channel: row.cadence_provider for row in (self.get("provider") or []) if row.cadence_provider}
+            
+            new_providers = {}
+            for channel, provider in current_providers.items():
+                if old_providers.get(channel) != provider:
+                    new_providers[channel] = provider
+            
+            if new_providers:
+                for channel, provider in new_providers.items():
+                    comms = frappe.get_all("Communication", filters={
+                        "reference_doctype": "Multi Channel Cadence",
+                        "reference_name": self.name,
+                        "communication_medium": channel,
+                        "reference_cadence_provider": ["is", "not set"]
+                    })
+                    for comm_info in comms:
+                        comm = frappe.get_doc("Communication", comm_info.name)
+                        comm.reference_cadence_provider = provider
+                        comm.save(ignore_permissions=True)
+        
         if self.has_value_changed("status"):
-            old_status = self.get_doc_before_save().status if self.get_doc_before_save() else None
-            unique_providers = list(set(row.reference_cadence_provider for row in (self.get("provider") or [])))
+            old_status = old_doc.status if old_doc else None
+            unique_providers = list(set(row.cadence_provider for row in (self.get("provider") or []) if row.cadence_provider))
             for provider in unique_providers:
                 enqueue(
                     "frappe_cadence.cadence.doctype.cadence_provider.cadence_provider.broadcast_event",

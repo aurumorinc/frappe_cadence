@@ -1,6 +1,6 @@
 {
  "actions": [],
- "autoname": "format:MC-CAMP-{YYYY}-{#####}",
+ "autoname": "format:MCC-{YYYY}-{#####}",
  "creation": "2019-06-30 16:05:30.015615",
  "doctype": "DocType",
  "editable_grid": 1,
@@ -40,7 +40,7 @@
    "fieldname": "start_date",
    "fieldtype": "Date",
    "label": "Start Date",
-   "reqd": 1
+   "reqd": 0
   },
   {
    "fieldname": "end_date",
@@ -75,7 +75,7 @@
    "fieldname": "provider",
    "fieldtype": "Table",
    "label": "Providers",
-   "options": "Channel Cadence Provider"
+   "options": "MCC Cadence Provider"
   }
  ],
  "links": [],
