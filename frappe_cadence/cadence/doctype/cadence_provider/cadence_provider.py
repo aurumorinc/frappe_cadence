@@ -8,7 +8,45 @@ import hashlib
 from typing import Dict, Optional
 
 class CadenceProvider(Document):
-    pass
+    def on_update(self):
+        if self.has_value_changed("enabled") and self.enabled == 1:
+            frappe.enqueue(
+                "frappe_cadence.cadence.doctype.cadence_provider.cadence_provider.populate_mccs_with_new_provider",
+                queue="low",
+                provider_name=self.name
+            )
+
+
+def populate_mccs_with_new_provider(provider_name):
+    # Fetch all Multi Channel Cadence records where status is active (Provisioning, Scheduled, In Progress)
+    mccs = frappe.get_all(
+        "Multi Channel Cadence",
+        filters={"status": ["in", ["Provisioning", "Scheduled", "In Progress"]]}
+    )
+    
+    for mcc in mccs:
+        doc = frappe.get_doc("Multi Channel Cadence", mcc.name)
+        resolved_providers = resolve_providers_for_mcc(mcc.name)
+        
+        current_providers = {row.channel: row.cadence_provider for row in doc.provider}
+        changed = False
+        
+        for channel, provider in resolved_providers.items():
+            if current_providers.get(channel) != provider:
+                # Update or append
+                existing_row = next((row for row in doc.provider if row.channel == channel), None)
+                if existing_row:
+                    existing_row.cadence_provider = provider
+                else:
+                    doc.append("provider", {
+                        "channel": channel,
+                        "cadence_provider": provider
+                    })
+                changed = True
+                
+        if changed:
+            doc.save(ignore_permissions=True)
+
 
 class CadenceProviderBase:
     """
@@ -126,7 +164,7 @@ def resolve_providers_for_mcc(mcc_name: str) -> Dict[str, str]:
     cadence_providers = []
     for ap in active_providers:
         channels = frappe.get_all(
-            "Channel Cadence Provider",
+            "Cadence Provider Channel",
             filters={"parent": ap.name, "parenttype": "Cadence Provider"},
             fields=["channel", "priority"]
         )
