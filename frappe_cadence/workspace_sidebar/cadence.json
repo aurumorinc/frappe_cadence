@@ -1,0 +1,184 @@
+{
+ "app": "frappe_cadence",
+ "docstatus": 0,
+ "doctype": "Workspace Sidebar",
+ "header_icon": "calendar",
+ "items": [
+  {
+   "child": 0,
+   "label": "Cadences",
+   "type": "Section Break"
+  },
+  {
+   "child": 1,
+   "label": "Cadence",
+   "link_to": "Cadence",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "label": "Multi Channel Cadence",
+   "link_to": "Multi Channel Cadence",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "label": "CRM Lead Cadence",
+   "link_to": "CRM Lead Cadence",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "label": "Schedules & Providers",
+   "type": "Section Break"
+  },
+  {
+   "child": 1,
+   "label": "Cadence Multi Channel Schedule",
+   "link_to": "Cadence Multi Channel Schedule",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "label": "Cadence Provider",
+   "link_to": "Cadence Provider",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "label": "Cadence Provider Channel",
+   "link_to": "Cadence Provider Channel",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "label": "MCC Cadence Provider",
+   "link_to": "MCC Cadence Provider",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "label": "Sift Settings",
+   "link_to": "Sift Settings",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "label": "Templates",
+   "type": "Section Break"
+  },
+  {
+   "child": 1,
+   "label": "Email Template",
+   "link_to": "Email Template",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "label": "SMS Template",
+   "link_to": "SMS Template",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "label": "WhatsApp Template",
+   "link_to": "WhatsApp Template",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "label": "LinkedIn Template",
+   "link_to": "LinkedIn Template",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "label": "Template Annotations",
+   "type": "Section Break"
+  },
+  {
+   "child": 1,
+   "label": "Email Template Annotation",
+   "link_to": "Email Template Annotation",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "label": "SMS Template Annotation",
+   "link_to": "SMS Template Annotation",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "label": "Whatsapp Template Annotation",
+   "link_to": "Whatsapp Template Annotation",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "label": "Linkedin Template Annotation",
+   "link_to": "Linkedin Template Annotation",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "label": "Tracking & Logs",
+   "type": "Section Break"
+  },
+  {
+   "child": 1,
+   "label": "Communication",
+   "link_to": "Communication",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "label": "Playbook Execution",
+   "link_to": "Playbook Execution",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "label": "History",
+   "link_to": "History",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "label": "History Image",
+   "link_to": "History Image",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "label": "Website Status",
+   "link_to": "Website Status",
+   "link_type": "DocType",
+   "type": "Link"
+  }
+ ],
+ "module": "Cadence",
+ "name": "Cadence",
+ "standard": 1,
+ "title": "Cadence"
+}
