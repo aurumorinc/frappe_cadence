@@ -1,11 +1,9 @@
-# Copyright (c) 2026, Aryan Singh and contributors
+# Copyright (c) 2024, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
-# import frappe
 from frappe.model.document import Document
 
-
-class ChannelCadenceProvider(Document):
+class MCCCadenceProvider(Document):
 	# begin: auto-generated types
 	# This code is auto-generated. Do not modify anything in this block.
 
@@ -15,11 +13,9 @@ class ChannelCadenceProvider(Document):
 		from frappe.types import DF
 
 		channel: DF.Literal["Email", "LinkedIn", "WhatsApp", "SMS", "Call"]
+		cadence_provider: DF.Link
 		parent: DF.Data
 		parentfield: DF.Data
 		parenttype: DF.Data
-		priority: DF.Int
-		reference_cadence_provider: DF.Link
 	# end: auto-generated types
-
 	pass
