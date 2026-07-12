@@ -47,7 +47,7 @@ class TestProviderRouter(UnitTestCase):
         def mock_get_all_side_effect(doctype, *args, **kwargs):
             if doctype == "Cadence Provider":
                 return [frappe._dict({"name": "Apollo"}), frappe._dict({"name": "SendGrid"}), frappe._dict({"name": "Mailgun"})]
-            elif doctype == "Channel Cadence Provider":
+            elif doctype == "Cadence Provider Channel":
                 parent = kwargs.get("filters", {}).get("parent")
                 if parent == "Apollo":
                     return [frappe._dict(channel="Email", priority=1)]
@@ -81,7 +81,7 @@ class TestProviderRouter(UnitTestCase):
         def mock_get_all_side_effect(doctype, *args, **kwargs):
             if doctype == "Cadence Provider":
                 return [frappe._dict({"name": "Apollo"}), frappe._dict({"name": "SendGrid"})]
-            elif doctype == "Channel Cadence Provider":
+            elif doctype == "Cadence Provider Channel":
                 parent = kwargs.get("filters", {}).get("parent")
                 if parent == "Apollo":
                     return [frappe._dict(channel="Email", priority=80)]
@@ -109,7 +109,7 @@ class TestProviderRouter(UnitTestCase):
         def mock_get_all_side_effect(doctype, *args, **kwargs):
             if doctype == "Cadence Provider":
                 return [frappe._dict({"name": "Apollo"})]
-            elif doctype == "Channel Cadence Provider":
+            elif doctype == "Cadence Provider Channel":
                 parent = kwargs.get("filters", {}).get("parent")
                 if parent == "Apollo":
                     return [frappe._dict(channel="Email", priority=1)]

@@ -17,8 +17,8 @@ class TestMultiChannelCadenceLifecycle(UnitTestCase):
         mcc = MultiChannelCadence({"doctype": "Multi Channel Cadence"})
         mcc.cadence_name = "Cadence-1"
         mcc.status = "Scheduled"
-        mcc.provider = [MagicMock(reference_cadence_provider="Dummy")]
-        mcc.get_doc_before_save = MagicMock(return_value=MagicMock(status="Draft"))
+        mcc.provider = [MagicMock(cadence_provider="Dummy")]
+        mcc.get_doc_before_save = MagicMock(return_value=MagicMock(status="Draft", provider=[]))
         mcc.has_value_changed = MagicMock(return_value=True)
         
         mcc.on_update()
@@ -69,3 +69,41 @@ class TestMultiChannelCadenceLifecycle(UnitTestCase):
             previous_schedule_name=None,
             now=True
         )
+
+    @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.frappe.get_all")
+    @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.frappe.get_doc")
+    def test_mcc_on_update_cascade_updates_communication(self, mock_get_doc, mock_get_all):
+        # Setup mock doc
+        mcc = MultiChannelCadence({"doctype": "Multi Channel Cadence", "name": "MCC-Cascade"})
+        mcc.cadence_name = "Cadence-Cascade"
+        
+        # New provider
+        mock_new_provider = MagicMock(channel="Email", cadence_provider="Apollo")
+        mcc.provider = [mock_new_provider]
+        
+        # Old provider (none)
+        mock_old_mcc = MagicMock(status="Scheduled", provider=[])
+        mcc.get_doc_before_save = MagicMock(return_value=mock_old_mcc)
+        
+        mcc.has_value_changed = MagicMock(return_value=False)
+        
+        # Mock communication
+        mock_comm_info = MagicMock(name="COMM-1")
+        mock_get_all.return_value = [mock_comm_info]
+        
+        mock_comm = MagicMock()
+        mock_get_doc.return_value = mock_comm
+        
+        mcc.on_update()
+        
+        # Verify get_all called for orphaned communications
+        mock_get_all.assert_called_with("Communication", filters={
+            "reference_doctype": "Multi Channel Cadence",
+            "reference_name": "MCC-Cascade",
+            "communication_medium": "Email",
+            "reference_cadence_provider": ["is", "not set"]
+        })
+        
+        # Verify communication updated and saved
+        self.assertEqual(mock_comm.reference_cadence_provider, "Apollo")
+        mock_comm.save.assert_called_with(ignore_permissions=True)

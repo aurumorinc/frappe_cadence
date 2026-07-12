@@ -16,7 +16,7 @@ class MockMultiChannelCadence:
         if key == "provider":
             row = MagicMock()
             row.channel = value.get("channel")
-            row.reference_cadence_provider = value.get("reference_cadence_provider")
+            row.cadence_provider = value.get("cadence_provider")
             self.provider.append(row)
 
     def get(self, key, default=None):
@@ -52,7 +52,7 @@ class TestMultiChannelCadence(UnitTestCase):
         mock_resolve.assert_called_once_with("MCC-001")
         self.assertEqual(len(mcc.provider), 2)
 
-        channels = {row.channel: row.reference_cadence_provider for row in mcc.provider}
+        channels = {row.channel: row.cadence_provider for row in mcc.provider}
         self.assertEqual(channels["Email"], "Apollo")
         self.assertEqual(channels["LinkedIn"], "PhantomBuster")
 
@@ -70,8 +70,8 @@ class TestMultiChannelCadence(UnitTestCase):
         mock_get_all.return_value = []
         
         # Add mock child table
-        mcc.append("provider", {"channel": "Email", "reference_cadence_provider": "Apollo"})
-        mcc.append("provider", {"channel": "LinkedIn", "reference_cadence_provider": "PhantomBuster"})
+        mcc.append("provider", {"channel": "Email", "cadence_provider": "Apollo"})
+        mcc.append("provider", {"channel": "LinkedIn", "cadence_provider": "PhantomBuster"})
         
         # Trigger on_update
         MultiChannelCadence.on_update(mcc)
