@@ -41,8 +41,7 @@ class MultiChannelCadence(Document):
                 queue="low",
                 provider_name=provider,
                 event_method="on_mcc_created",
-                mcc_doc=self,
-                now=frappe.flags.in_test
+                mcc_doc=self
             )
 
     def on_update(self):
@@ -83,8 +82,7 @@ class MultiChannelCadence(Document):
                     event_method="on_mcc_status_changed",
                     mcc_doc=self,
                     old_status=old_status,
-                    new_status=self.status,
-                    now=frappe.flags.in_test
+                    new_status=self.status
                 )
 
         # Always enqueue steps; Frappe orchestrates delays.
@@ -119,11 +117,10 @@ class MultiChannelCadence(Document):
                 
                 enqueue(
                     "frappe_cadence.cadence.multi_channel_cadence.process_cadence_step",
-                    queue="default",
+                    queue="medium",
                     cadence_name=self.name,
                     schedule_name=schedule.name,
-                    previous_schedule_name=previous_schedule_name,
-                    now=frappe.flags.in_test
+                    previous_schedule_name=previous_schedule_name
                 )
 
 def sync_lead_cadence(doc, method):
