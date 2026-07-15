@@ -15,8 +15,7 @@ def on_communication_update(doc, method=None):
                     event_method="on_communication_status_changed",
                     comm_doc=doc,
                     old_status=old_status,
-                    new_status=new_status,
-                    now=frappe.flags.in_test
+                    new_status=new_status
                 )
 
 def on_communication_create(doc, method=None):
@@ -28,6 +27,5 @@ def on_communication_create(doc, method=None):
                 queue="low",
                 provider_name=provider_name,
                 event_method="on_communication_created",
-                comm_doc=doc,
-                now=frappe.flags.in_test
+                comm_doc=doc
             )
