@@ -12,37 +12,48 @@ def get_sift_settings() -> tuple:
         
     return base_url.rstrip('/'), api_key
 
-def get_history(reference_doctype: str, reference_name: str) -> list:
-    histories = frappe.get_all(
-        "History",
-        filters={"reference_doctype": reference_doctype, "reference_name": reference_name},
-        fields=["name", "content"],
-        order_by="creation asc"
-    )
+def get_history(reference_doctype: str, reference_name: str, since_date=None) -> list:
+    from frappe.utils import add_months, today
+    
+    if not since_date:
+        since_date = add_months(today(), -3)
+        
+    or_filters = {
+        reference_doctype: reference_name
+    }
+    if reference_doctype == "CRM Lead":
+        lead = frappe.get_doc("CRM Lead", reference_name)
+        if lead.organization:
+            or_filters["CRM Organization"] = lead.organization
+            
+    histories = []
+    for ref_dt, ref_name in or_filters.items():
+        histories.extend(frappe.get_all(
+            "History",
+            filters={"reference_doctype": ref_dt, "reference_name": ref_name, "creation": [">=", since_date]},
+            fields=["name", "markdown", "screenshot", "creation"],
+            order_by="creation asc"
+        ))
+        
+    # Sort the combined histories by creation date
+    histories.sort(key=lambda x: x.creation)
     
     messages = []
     from markdownify import markdownify
     for h in histories:
         content_blocks = []
-        if h.content:
-            content_blocks.append({"type": "text", "text": markdownify(h.content)})
+        if h.markdown:
+            content_blocks.append({"type": "text", "text": markdownify(h.markdown)})
             
-        history_images = frappe.get_all(
-            "History Image",
-            filters={"parent": h.name, "parenttype": "History"},
-            fields=["image"]
-        )
-        
-        for img in history_images:
-            if img.image:
-                try:
-                    file_doc = frappe.get_doc("File", {"file_url": img.image})
-                    content_blocks.append({
-                        "type": "image_url",
-                        "image_url": {"url": file_doc.presigned_url}
-                    })
-                except frappe.DoesNotExistError:
-                    pass
+        if h.screenshot:
+            try:
+                file_doc = frappe.get_doc("File", {"file_url": h.screenshot})
+                content_blocks.append({
+                    "type": "image_url",
+                    "image_url": {"url": file_doc.presigned_url}
+                })
+            except frappe.DoesNotExistError:
+                pass
 
         if content_blocks:
             messages.append({"role": "user", "content": content_blocks})
@@ -122,9 +133,16 @@ def optimize(template_doctype: str, template_name: str) -> None:
         if not is_annotation_pending(ann):
             messages = []
             
-            sender = frappe.db.get_value("User", getattr(ann, "sender", None), ["full_name", "bio"], as_dict=True) if getattr(ann, "sender", None) else {}
+            from frappe_cadence.utils.user_bio import get_user_bio
+            sender_id = getattr(ann, "sender", None)
+            cadence_ref = ann.reference_name if ann.reference_doctype == "Multi Channel Cadence" else None
+            
+            sender_bio_content = get_user_bio(sender_id, cadence_ref) if sender_id else None
+            sender_bio = markdownify(sender_bio_content) if sender_bio_content else ""
+            
+            sender = frappe.db.get_value("User", sender_id, ["full_name"], as_dict=True) if sender_id else {}
             sender_name = sender.get("full_name") or ""
-            sender_bio = markdownify(sender.get("bio") or "")
+            
             if sender_name or sender_bio:
                 messages.append({"role": "system", "content": f"Sender Name: {sender_name}\nSender Bio:\n{sender_bio}"})
 
@@ -255,9 +273,16 @@ def predict(template_doctype: str, template_name: str) -> None:
             
             messages = []
             
-            sender = frappe.db.get_value("User", getattr(ann, "sender", None), ["full_name", "bio"], as_dict=True) if getattr(ann, "sender", None) else {}
+            from frappe_cadence.utils.user_bio import get_user_bio
+            sender_id = getattr(ann, "sender", None)
+            cadence_ref = ann.reference_name if ann.reference_doctype == "Multi Channel Cadence" else None
+            
+            sender_bio_content = get_user_bio(sender_id, cadence_ref) if sender_id else None
+            sender_bio = markdownify(sender_bio_content) if sender_bio_content else ""
+            
+            sender = frappe.db.get_value("User", sender_id, ["full_name"], as_dict=True) if sender_id else {}
             sender_name = sender.get("full_name") or ""
-            sender_bio = markdownify(sender.get("bio") or "")
+            
             if sender_name or sender_bio:
                 messages.append({"role": "system", "content": f"Sender Name: {sender_name}\nSender Bio:\n{sender_bio}"})
 
