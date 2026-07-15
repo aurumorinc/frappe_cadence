@@ -5,14 +5,15 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "image"
+  "history"
  ],
  "fields": [
   {
-   "fieldname": "image",
-   "fieldtype": "Attach Image",
+   "fieldname": "history",
+   "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Image",
+   "label": "History",
+   "options": "History",
    "reqd": 1
   }
  ],
@@ -22,7 +23,7 @@
  "modified": "2024-03-27 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Cadence",
- "name": "History Image",
+ "name": "History Group History",
  "naming_rule": "Random",
  "owner": "Administrator",
  "permissions": [],

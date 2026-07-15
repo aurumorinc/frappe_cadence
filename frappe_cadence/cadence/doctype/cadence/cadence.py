@@ -49,6 +49,72 @@ class Cadence(Document):
 		mc.crm_cadence = self.name
 		mc.save(ignore_permissions=True)
 
+	def before_save(self):
+		import ast
+		import json
+
+		if not self.assign_condition:
+			self.assign_condition_json = ""
+			return
+
+		try:
+			tree = ast.parse(self.assign_condition, mode='eval')
+			filters = self._ast_to_filters(tree.body)
+			self.assign_condition_json = json.dumps(filters)
+		except Exception as e:
+			frappe.throw(f"Invalid condition syntax: {str(e)}", frappe.ValidationError)
+
+	def _ast_to_filters(self, node):
+		import ast
+
+		operators = {
+			ast.Eq: "=",
+			ast.NotEq: "!=",
+			ast.Gt: ">",
+			ast.Lt: "<",
+			ast.GtE: ">=",
+			ast.LtE: "<=",
+			ast.In: "in",
+			ast.NotIn: "not in",
+			ast.Is: "is",
+		}
+
+		if isinstance(node, ast.BoolOp) and isinstance(node.op, ast.And):
+			filters = []
+			for val in node.values:
+				filters.extend(self._ast_to_filters(val))
+			return filters
+
+		elif isinstance(node, ast.Compare):
+			if len(node.ops) != 1 or len(node.comparators) != 1:
+				raise ValueError("Only simple comparisons are supported")
+
+			op = type(node.ops[0])
+			if op not in operators:
+				raise ValueError(f"Unsupported operator: {op.__name__}")
+
+			left = node.left
+			if not (isinstance(left, ast.Attribute) and isinstance(left.value, ast.Name) and left.value.id == "doc"):
+				raise ValueError("Left side of comparison must be a doc attribute (e.g., doc.status)")
+
+			fieldname = left.attr
+
+			right = node.comparators[0]
+			if isinstance(right, ast.Constant):
+				value = right.value
+			elif isinstance(right, (ast.List, ast.Tuple)):
+				value = [el.value for el in right.elts if isinstance(el, ast.Constant)]
+			else:
+				raise ValueError("Right side of comparison must be a constant or a list of constants")
+
+			if op == ast.Eq and isinstance(value, list) and len(value) == 2 and isinstance(value[0], str) and value[0].lower() in ("like", "not like"):
+				return [[fieldname, value[0].lower(), value[1]]]
+
+			return [[fieldname, operators[op], value]]
+
+		else:
+			raise ValueError("Unsupported expression structure")
+
 	def on_change(self):
 		if frappe.db.exists("UTM Campaign", self.name):
 			mc = frappe.get_doc("UTM Campaign", self.name)
@@ -60,18 +126,18 @@ class Cadence(Document):
 		mc.save(ignore_permissions=True)
 
 	def on_update(self):
+		from frappe_controller.utils.background_jobs import enqueue
+
 		self.ensure_playbook()
-		frappe.enqueue(
-			"frappe_cadence.cadence.doctype.cadence.cadence.update_sequences",
-			queue="long",
-			cadence_name=self.name,
-			now=frappe.flags.in_test
+		enqueue(
+			"frappe_cadence.cadence.doctype.cadence_provider.cadence_provider.on_cadence_update",
+			queue="low",
+			doc=self
 		)
-		frappe.enqueue(
+		enqueue(
 			"frappe_cadence.cadence.doctype.cadence.cadence.evaluate_cadence_for_leads",
-			queue="long",
-			cadence_name=self.name,
-			now=frappe.flags.in_test
+			queue="low",
+			cadence_name=self.name
 		)
 
 	def ensure_playbook(self):
@@ -98,28 +164,16 @@ class Cadence(Document):
 			except Exception as e:
 				frappe.log_error(title="Failed to create/link playbook for Cadence", message=str(e))
 
-def update_sequences(cadence_name):
-	if not frappe.db.exists("DocType", "Sequence"):
-		return
-	try:
-		sequences = frappe.get_all("Sequence", filters={"cadence": cadence_name}, pluck="name")
-		for seq_name in sequences:
-			seq = frappe.get_doc("Sequence", seq_name)
-			seq.populate_sequence_steps()
-			seq.save(ignore_permissions=True)
-	except Exception as e:
-		frappe.log_error(title="Failed to update sequences for Cadence", message=str(e))
-
 import json
-from frappe.utils.safe_exec import safe_eval
 
 def enqueue_lead_evaluation(doc, method):
 	"""Enqueues the lead for cadence evaluation."""
-	frappe.enqueue(
+	from frappe_controller.utils.background_jobs import enqueue
+
+	enqueue(
 		"frappe_cadence.cadence.doctype.cadence.cadence.evaluate_lead_for_cadences",
-		queue="short",
-		lead_name=doc.name,
-		now=frappe.flags.in_test
+		queue="high",
+		lead_name=doc.name
 	)
 
 def evaluate_cadence_for_leads(cadence_name):
@@ -130,9 +184,9 @@ def evaluate_cadence_for_leads(cadence_name):
 		frappe.log_error(title="Cadence evaluation failed", message=f"Cadence {cadence_name} does not exist.")
 		return
 
-	if not cadence.assign_condition_json and not cadence.assign_condition:
+	if not cadence.assign_condition_json:
 		return
-		
+
 	# Fetch already enrolled leads
 	enrolled_leads = frappe.get_all(
 		"Multi Channel Cadence",
@@ -140,37 +194,23 @@ def evaluate_cadence_for_leads(cadence_name):
 		pluck="recipient"
 	)
 
-	if cadence.assign_condition_json:
-		try:
-			filters = json.loads(cadence.assign_condition_json)
-			if not isinstance(filters, list):
-				frappe.log_error(title="Invalid Cadence Assign Condition JSON", message="Filters must be a list.")
-			else:
-				# Append the exclusion filter
-				if enrolled_leads:
-					filters.append(["name", "not in", enrolled_leads])
-				try:
-					# Fetch leads directly matching the condition
-					targeted_leads = frappe.get_all("CRM Lead", filters=filters, pluck="name")
-					for lead_name in targeted_leads:
-						add_lead_to_cadence(cadence, lead_name)
-				except Exception as e:
-					frappe.log_error(title="Error evaluating Cadence assignment JSON", message=str(e))
-		except (json.JSONDecodeError, TypeError) as e:
-			frappe.log_error(title="Invalid Cadence Assign Condition JSON", message=str(e))
-
-	if cadence.assign_condition:
-		try:
-			filters = []
+	try:
+		filters = json.loads(cadence.assign_condition_json)
+		if not isinstance(filters, list):
+			frappe.log_error(title="Invalid Cadence Assign Condition JSON", message="Filters must be a list.")
+		else:
+			# Append the exclusion filter
 			if enrolled_leads:
 				filters.append(["name", "not in", enrolled_leads])
-			unenrolled_leads = frappe.get_all("CRM Lead", filters=filters, pluck="name")
-			for lead_name in unenrolled_leads:
-				doc = frappe.get_doc("CRM Lead", lead_name)
-				if frappe.safe_eval(cadence.assign_condition, None, {"doc": doc}):
+			try:
+				# Fetch leads directly matching the condition
+				targeted_leads = frappe.get_all("CRM Lead", filters=filters, pluck="name")
+				for lead_name in targeted_leads:
 					add_lead_to_cadence(cadence, lead_name)
-		except Exception as e:
-			frappe.log_error(title="Error evaluating Cadence assignment Python", message=str(e))
+			except Exception as e:
+				frappe.log_error(title="Error evaluating Cadence assignment JSON", message=str(e))
+	except (json.JSONDecodeError, TypeError) as e:
+		frappe.log_error(title="Invalid Cadence Assign Condition JSON", message=str(e))
 
 def evaluate_lead_for_cadences(lead_name):
 	"""Evaluates a single Lead against all Cadences."""
@@ -180,28 +220,26 @@ def evaluate_lead_for_cadences(lead_name):
 		frappe.log_error(title="Lead evaluation failed", message=f"Lead {lead_name} does not exist.")
 		return
 		
-	# Get cadences with either condition set
+	# Get cadences with condition set
 	cadences = frappe.get_all(
 		"Cadence",
 		or_filters=[
 			["assign_condition_json", "!=", ""],
-			["assign_condition_json", "is", "set"],
-			["assign_condition", "!=", ""],
-			["assign_condition", "is", "set"]
+			["assign_condition_json", "is", "set"]
 		],
 		pluck="name"
 	)
 
 	for cadence_name in cadences:
 		cadence = frappe.get_doc("Cadence", cadence_name)
-		
+
 		# Skip if enrolled
 		if frappe.db.exists("Multi Channel Cadence", {"cadence_name": cadence.name, "recipient": lead_name}):
 			continue
-			
+
 		matched = False
-		
-		# Try JSON eval via DB
+
+		# JSON eval via DB
 		if cadence.assign_condition_json:
 			try:
 				filters = json.loads(cadence.assign_condition_json)
@@ -210,14 +248,7 @@ def evaluate_lead_for_cadences(lead_name):
 					matched = True
 			except Exception as e:
 				frappe.log_error(title="Error evaluating Cadence assignment JSON", message=str(e))
-				
-		# Try python eval
-		if not matched and cadence.assign_condition:
-			try:
-				matched = frappe.safe_eval(cadence.assign_condition, None, {"doc": lead_doc})
-			except Exception as e:
-				frappe.log_error(title="Error evaluating Cadence assignment Python", message=str(e))
-				
+
 		if matched:
 			add_lead_to_cadence(cadence, lead_name)
 
@@ -257,11 +288,13 @@ def determine_sender(cadence):
 		
 	elif cadence.rule == "Load Balancing":
 		# Query to find the user with the fewest Multi Channel Cadences
-		counts = frappe.get_all(
-			"Multi Channel Cadence",
-			filters={"sender": ["in", user_ids], "docstatus": ["!=", 2]},
-			fields=["sender", "count(name) as cnt"],
-			group_by="sender"
+		counts = frappe.db.sql(
+			"""
+			SELECT sender, COUNT(name) as cnt
+			FROM `tabMulti Channel Cadence`
+			WHERE sender IN %s AND docstatus != 2
+			GROUP BY sender
+			""", (tuple(user_ids),), as_dict=True
 		)
 		
 		# Map counts to users

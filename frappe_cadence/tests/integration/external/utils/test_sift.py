@@ -34,8 +34,8 @@ class TestSiftExternalIntegration(IntegrationTestCase):
     @my_vcr.use_cassette("test_optimize_external.yaml")
     def test_optimize_external(self):
         settings = frappe.get_single("Sift Settings")
-        settings.sift_base_url = frappe.conf.get("sift_base_url")
-        settings.sift_api_key = frappe.conf.get("sift_api_key")
+        settings.sift_base_url = frappe.conf.get("sift_base_url") or "https://windmill.aurumor.com/api/w/aurumor/jobs/run/p/f/sift"
+        settings.sift_api_key = frappe.conf.get("sift_api_key") or "test-key"
         settings.save(ignore_permissions=True)
 
         # 2. Setup Models
@@ -98,8 +98,8 @@ class TestSiftExternalIntegration(IntegrationTestCase):
     @my_vcr.use_cassette("test_predict_external.yaml")
     def test_predict_external(self):
         settings = frappe.get_single("Sift Settings")
-        settings.sift_base_url = frappe.conf.get("sift_base_url")
-        settings.sift_api_key = frappe.conf.get("sift_api_key")
+        settings.sift_base_url = frappe.conf.get("sift_base_url") or "https://windmill.aurumor.com/api/w/aurumor/jobs/run/p/f/sift"
+        settings.sift_api_key = frappe.conf.get("sift_api_key") or "test-key"
         settings.save(ignore_permissions=True)
 
         # 2. Setup Models & Template

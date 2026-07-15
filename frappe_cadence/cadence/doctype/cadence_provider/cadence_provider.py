@@ -9,8 +9,10 @@ from typing import Dict, Optional
 
 class CadenceProvider(Document):
     def on_update(self):
+        from frappe_controller.utils.background_jobs import enqueue
+
         if self.has_value_changed("enabled") and self.enabled == 1:
-            frappe.enqueue(
+            enqueue(
                 "frappe_cadence.cadence.doctype.cadence_provider.cadence_provider.populate_mccs_with_new_provider",
                 queue="low",
                 provider_name=self.name
@@ -48,7 +50,7 @@ def populate_mccs_with_new_provider(provider_name):
             doc.save(ignore_permissions=True)
 
 
-class CadenceProviderBase:
+class BaseCadenceProvider:
     """
     Abstract base class for Cadence Providers.
     Any integration (Apollo, Outreach, etc.) must implement this interface.
@@ -60,7 +62,7 @@ class CadenceProviderBase:
     def on_mcc_status_changed(self, mcc_doc, old_status, new_status):
         pass
 
-    def on_cadence_updated(self, cadence_doc):
+    def on_cadence_update(self, doc, method=None):
         pass
 
     def on_communication_created(self, comm_doc):
@@ -89,7 +91,7 @@ class CadenceProviderBase:
                     "doctype": "History",
                     "reference_doctype": "Multi Channel Cadence",
                     "reference_name": mcc_name,
-                    "content": "Replied",
+                    "markdown": "Replied",
                     "url": data.get("url", "https://example.com") if data else "https://example.com"
                 }).insert(ignore_permissions=True)
                 
@@ -100,7 +102,7 @@ class CadenceProviderBase:
                     "doctype": "History",
                     "reference_doctype": "Multi Channel Cadence",
                     "reference_name": mcc_name,
-                    "content": "Bounced",
+                    "markdown": "Bounced",
                     "url": data.get("url", "https://example.com") if data else "https://example.com"
                 }).insert(ignore_permissions=True)
                 
@@ -116,7 +118,7 @@ class CadenceProviderBase:
                         "doctype": "History",
                         "reference_doctype": "Multi Channel Cadence",
                         "reference_name": mcc_name,
-                        "content": "Message Sent" if event_type == "message_sent" else "Message Opened",
+                        "markdown": "Message Sent" if event_type == "message_sent" else "Message Opened",
                         "url": data.get("url", "https://example.com") if data else "https://example.com"
                     }).insert(ignore_permissions=True)
 
@@ -141,6 +143,16 @@ def broadcast_event(provider_name, event_method, *args, **kwargs):
         method(*args, **kwargs)
     except Exception as e:
         frappe.log_error(title=f"Cadence Provider Event Error: {event_method}", message=frappe.get_traceback())
+
+
+def on_cadence_update(doc, method=None):
+    active_providers = frappe.get_all(
+        "Cadence Provider",
+        filters={"enabled": 1},
+        pluck="name"
+    )
+    for provider_name in active_providers:
+        broadcast_event(provider_name, "on_cadence_update", doc=doc, method=method)
 
 
 def resolve_providers_for_mcc(mcc_name: str) -> Dict[str, str]:

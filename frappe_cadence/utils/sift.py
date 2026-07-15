@@ -12,43 +12,6 @@ def get_sift_settings() -> tuple:
         
     return base_url.rstrip('/'), api_key
 
-def get_history(reference_doctype: str, reference_name: str) -> list:
-    histories = frappe.get_all(
-        "History",
-        filters={"reference_doctype": reference_doctype, "reference_name": reference_name},
-        fields=["name", "content"],
-        order_by="creation asc"
-    )
-    
-    messages = []
-    from markdownify import markdownify
-    for h in histories:
-        content_blocks = []
-        if h.content:
-            content_blocks.append({"type": "text", "text": markdownify(h.content)})
-            
-        history_images = frappe.get_all(
-            "History Image",
-            filters={"parent": h.name, "parenttype": "History"},
-            fields=["image"]
-        )
-        
-        for img in history_images:
-            if img.image:
-                try:
-                    file_doc = frappe.get_doc("File", {"file_url": img.image})
-                    content_blocks.append({
-                        "type": "image_url",
-                        "image_url": {"url": file_doc.presigned_url}
-                    })
-                except frappe.DoesNotExistError:
-                    pass
-
-        if content_blocks:
-            messages.append({"role": "user", "content": content_blocks})
-            
-    return messages
-
 def get_annotation_system_fields() -> list:
     return ['name', 'owner', 'creation', 'modified', 'modified_by', 'parent', 'parentfield', 'parenttype', 'idx', 'reference_doctype', 'reference_name', 'sender', 'score', 'feedback', '_user_tags', '_comments', '_assign', '_liked_by']
 
@@ -122,12 +85,20 @@ def optimize(template_doctype: str, template_name: str) -> None:
         if not is_annotation_pending(ann):
             messages = []
             
-            sender = frappe.db.get_value("User", getattr(ann, "sender", None), ["full_name", "bio"], as_dict=True) if getattr(ann, "sender", None) else {}
+            from frappe_cadence.cadence.doctype.user_bio.user_bio import get_user_bio
+            sender_id = getattr(ann, "sender", None)
+            cadence_ref = ann.reference_name if ann.reference_doctype == "Multi Channel Cadence" else None
+            
+            sender_bio_content = get_user_bio(sender_id, cadence_ref) if sender_id else None
+            sender_bio = markdownify(sender_bio_content) if sender_bio_content else ""
+            
+            sender = frappe.db.get_value("User", sender_id, ["full_name"], as_dict=True) if sender_id else {}
             sender_name = sender.get("full_name") or ""
-            sender_bio = markdownify(sender.get("bio") or "")
+            
             if sender_name or sender_bio:
                 messages.append({"role": "system", "content": f"Sender Name: {sender_name}\nSender Bio:\n{sender_bio}"})
 
+            from frappe_cadence.cadence.doctype.history.history import get_history
             history_messages = get_history(ann.reference_doctype, ann.reference_name)
             messages.extend(history_messages)
             
@@ -255,12 +226,20 @@ def predict(template_doctype: str, template_name: str) -> None:
             
             messages = []
             
-            sender = frappe.db.get_value("User", getattr(ann, "sender", None), ["full_name", "bio"], as_dict=True) if getattr(ann, "sender", None) else {}
+            from frappe_cadence.cadence.doctype.user_bio.user_bio import get_user_bio
+            sender_id = getattr(ann, "sender", None)
+            cadence_ref = ann.reference_name if ann.reference_doctype == "Multi Channel Cadence" else None
+            
+            sender_bio_content = get_user_bio(sender_id, cadence_ref) if sender_id else None
+            sender_bio = markdownify(sender_bio_content) if sender_bio_content else ""
+            
+            sender = frappe.db.get_value("User", sender_id, ["full_name"], as_dict=True) if sender_id else {}
             sender_name = sender.get("full_name") or ""
-            sender_bio = markdownify(sender.get("bio") or "")
+            
             if sender_name or sender_bio:
                 messages.append({"role": "system", "content": f"Sender Name: {sender_name}\nSender Bio:\n{sender_bio}"})
 
+            from frappe_cadence.cadence.doctype.history.history import get_history
             history_messages = get_history(ann.reference_doctype, ann.reference_name)
             messages.extend(history_messages)
             

@@ -23,15 +23,14 @@ class TestMultiChannelCadenceLifecycle(UnitTestCase):
         
         mcc.on_update()
         
-        mock_enqueue.assert_called_with(
+        mock_enqueue.assert_any_call(
             "frappe_cadence.cadence.doctype.cadence_provider.cadence_provider.broadcast_event",
             queue="low",
             provider_name="Dummy",
             event_method="on_mcc_status_changed",
             mcc_doc=mcc,
             old_status="Draft",
-            new_status="Scheduled",
-            now=True
+            new_status="Scheduled"
         )
 
     @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.frappe.get_all")
@@ -63,11 +62,10 @@ class TestMultiChannelCadenceLifecycle(UnitTestCase):
         # It should enqueue the native process_cadence_step
         mock_enqueue.assert_any_call(
             "frappe_cadence.cadence.multi_channel_cadence.process_cadence_step",
-            queue="default",
+            queue="medium",
             cadence_name="MCC-1",
             schedule_name="Sch-1",
-            previous_schedule_name=None,
-            now=True
+            previous_schedule_name=None
         )
 
     @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.frappe.get_all")

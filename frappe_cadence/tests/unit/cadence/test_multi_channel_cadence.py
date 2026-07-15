@@ -5,6 +5,23 @@ from frappe.tests import UnitTestCase
 
 class TestMultiChannelCadence(UnitTestCase):
 
+    def tearDown(self):
+        if hasattr(frappe, "_site_cached_load_app_hooks") and hasattr(frappe._site_cached_load_app_hooks, "clear_cache"):
+            frappe._site_cached_load_app_hooks.clear_cache()
+        if hasattr(frappe, "_request_cached_load_app_hooks") and hasattr(frappe._request_cached_load_app_hooks, "clear_cache"):
+            frappe._request_cached_load_app_hooks.clear_cache()
+        if hasattr(frappe.local, 'site_cache'):
+            frappe.local.site_cache.clear()
+        if hasattr(frappe.local, 'request_cache'):
+            frappe.local.request_cache.clear()
+        if hasattr(frappe, "client_cache") and hasattr(frappe.client_cache, "delete_value"):
+            frappe.client_cache.delete_value("app_hooks")
+        if hasattr(frappe, "cache") and hasattr(frappe.cache, "delete_value"):
+            frappe.cache.delete_value("app_hooks")
+        elif hasattr(frappe, "cache") and callable(frappe.cache):
+            frappe.cache().delete_value("app_hooks")
+        super().tearDown()
+
     @patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_doc")
     @patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_all")
     @patch("frappe_cadence.cadence.multi_channel_cadence.emit_event")
@@ -61,12 +78,15 @@ class TestMultiChannelCadence(UnitTestCase):
         mock_comm.insert.assert_called_once_with(ignore_permissions=True)
         mock_emit_event.assert_called_once_with("cadence_step_completed", {"cadence_name": "MCC-001", "schedule_name": "SCHED-001"})
 
+    @patch("frappe_cadence.cadence.doctype.history.history.get_history")
     @patch("frappe_cadence.cadence.multi_channel_cadence.requests.post")
     @patch("frappe_cadence.cadence.multi_channel_cadence.wait_for_event")
     @patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_all")
     @patch("frappe_cadence.cadence.multi_channel_cadence.get_url")
     @patch("frappe_cadence.cadence.multi_channel_cadence.add_months")
-    def test_process_cadence_step_sift_integration(self, mock_add_months, mock_get_url, mock_get_all, mock_wait_for_event, mock_post):
+    @patch("frappe_cadence.cadence.doctype.user_bio.user_bio.get_user_bio")
+    def test_process_cadence_step_sift_integration(self, mock_get_user_bio, mock_add_months, mock_get_url, mock_get_all, mock_wait_for_event, mock_post, mock_get_history):
+        mock_get_user_bio.return_value = "<p>I am a <strong>bold</strong> user.</p>"
         mock_get_url.return_value = "http://test.com/webhook"
         mock_add_months.return_value = "2024-01-01"
         from frappe_cadence.cadence.multi_channel_cadence import process_cadence_step
@@ -102,28 +122,14 @@ class TestMultiChannelCadence(UnitTestCase):
         mock_comm = MagicMock()
         mock_comm.name = "COMM-001"
         
-        mock_history = MagicMock()
-        mock_history.content = "Test History"
-        mock_history.name = "HIST-001"
-        
-        mock_history_image = MagicMock()
-        mock_history_image.image = "/files/test.png"
-        
-        mock_file = MagicMock()
-        mock_file.presigned_url = "https://s3.example.com/test.png?sig=123"
+        mock_get_history.return_value = [
+            {"role": "user", "content": [{"type": "text", "text": "Test History"}, {"type": "image_url", "image_url": {"url": "https://s3.example.com/test.png?sig=123"}}]}
+        ]
         
         # Mock get_all
         def get_all_side_effect(doctype, *args, **kwargs):
             if doctype == "Communication":
                 return []
-            elif doctype == "History":
-                filters = kwargs.get("filters", [])
-                for f in filters:
-                    if len(f) >= 3 and f[2] == "LEAD-001":
-                        return [mock_history]
-                return []
-            elif doctype == "History Image":
-                return [mock_history_image]
             return []
             
         mock_get_all.side_effect = get_all_side_effect
@@ -138,8 +144,6 @@ class TestMultiChannelCadence(UnitTestCase):
                 return mock_template
             elif len(args) == 2 and args[0] == "CRM Lead":
                 return mock_lead
-            elif len(args) == 2 and args[0] == "File":
-                return mock_file
             elif len(args) == 1 and isinstance(args[0], dict) and args[0].get("doctype") == "Communication":
                 return mock_comm
             return original_get_doc(*args, **kwargs)
@@ -199,11 +203,13 @@ class TestMultiChannelCadence(UnitTestCase):
                         condition="argument.get('communication_id') == 'COMM-001'"
                     )
 
+    @patch("frappe_cadence.cadence.doctype.history.history.get_history")
     @patch("frappe_cadence.cadence.multi_channel_cadence.requests.post")
     @patch("frappe_cadence.cadence.multi_channel_cadence.wait_for_event")
     @patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_all")
     @patch("frappe_cadence.cadence.multi_channel_cadence.get_url")
-    def test_process_cadence_step_sift_payload_markdown(self, mock_get_url, mock_get_all, mock_wait_for_event, mock_post):
+    @patch("frappe_cadence.cadence.doctype.user_bio.user_bio.get_user_bio")
+    def test_process_cadence_step_sift_payload_markdown(self, mock_get_user_bio, mock_get_url, mock_get_all, mock_wait_for_event, mock_post, mock_get_history):
         mock_get_url.return_value = "http://test.com/webhook"
         from frappe_cadence.cadence.multi_channel_cadence import process_cadence_step
         import json
@@ -238,6 +244,8 @@ class TestMultiChannelCadence(UnitTestCase):
         mock_comm = MagicMock()
         mock_comm.name = "COMM-002"
         
+        mock_get_history.return_value = []
+        
         # Mock get_all to return no drafts and no history
         def get_all_side_effect(doctype, *args, **kwargs):
             return []
@@ -264,13 +272,15 @@ class TestMultiChannelCadence(UnitTestCase):
                 return mock_sift_settings
             return original_get_single(*args, **kwargs)
             
+        mock_get_user_bio.return_value = "<p>I am a <strong>bold</strong> user.</p>"
+        
         # Mock frappe.db.get_value to return HTML bio
         original_get_value = frappe.db.get_value
         def get_value_side_effect(*args, **kwargs):
             doctype = kwargs.get("doctype") or (args[0] if len(args) > 0 else None)
             filters = kwargs.get("filters") or (args[1] if len(args) > 1 else None)
             if doctype == "User" and filters == "user@test.com":
-                return {"full_name": "Test User", "bio": "<p>I am a <strong>bold</strong> user.</p>"}
+                return {"full_name": "Test User"}
             return original_get_value(*args, **kwargs)
             
         with patch.object(frappe, "get_doc", side_effect=get_doc_side_effect):

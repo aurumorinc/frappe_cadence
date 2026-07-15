@@ -1,15 +1,13 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "format:HIST-{YYYY}-{#####}",
+ "autoname": "format:HISTGRP-{YYYY}-{#####}",
  "creation": "2024-03-27 12:00:00.000000",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "url",
-  "markdown",
-  "screenshot",
-  "html",
+  "history",
   "reference_doctype",
   "reference_name"
  ],
@@ -18,25 +16,14 @@
    "fieldname": "url",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "URL"
+   "label": "URL",
+   "reqd": 1
   },
   {
-   "fieldname": "markdown",
-   "fieldtype": "Text Editor",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Markdown"
-  },
-  {
-   "fieldname": "screenshot",
-   "fieldtype": "Attach Image",
-   "label": "Screenshot"
-  },
-  {
-   "fieldname": "html",
-   "fieldtype": "Code",
-   "options": "HTML",
-   "label": "HTML"
+   "fieldname": "history",
+   "fieldtype": "Table",
+   "label": "History",
+   "options": "History Group History"
   },
   {
    "fieldname": "reference_doctype",
@@ -58,7 +45,7 @@
  "modified": "2024-03-27 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Cadence",
- "name": "History",
+ "name": "History Group",
  "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [

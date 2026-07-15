@@ -94,9 +94,8 @@
   },
   {
    "fieldname": "assign_condition",
-   "fieldtype": "Code",
-   "label": "Assign Condition",
-   "options": "PythonExpression"
+   "fieldtype": "Small Text",
+   "label": "Assign Condition"
   },
   {
    "fieldname": "assign_condition_json",

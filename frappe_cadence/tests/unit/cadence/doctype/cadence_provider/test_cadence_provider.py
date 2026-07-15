@@ -1,15 +1,32 @@
 import frappe
 from frappe.tests import UnitTestCase
-from frappe_cadence.cadence.doctype.cadence_provider.cadence_provider import CadenceProviderBase, get_provider_instance, broadcast_event
+from frappe_cadence.cadence.doctype.cadence_provider.cadence_provider import BaseCadenceProvider, get_provider_instance, broadcast_event, on_cadence_update
 from unittest.mock import patch, MagicMock
 
-class DummyCadenceProvider(CadenceProviderBase):
+class DummyCadenceProvider(BaseCadenceProvider):
     def on_mcc_status_changed(self, mcc_doc, old_status, new_status):
         pass
 
 class TestCadenceProviderInterface(UnitTestCase):
 
-    @patch("frappe.get_hooks")
+    def tearDown(self):
+        if hasattr(frappe, "_site_cached_load_app_hooks") and hasattr(frappe._site_cached_load_app_hooks, "clear_cache"):
+            frappe._site_cached_load_app_hooks.clear_cache()
+        if hasattr(frappe, "_request_cached_load_app_hooks") and hasattr(frappe._request_cached_load_app_hooks, "clear_cache"):
+            frappe._request_cached_load_app_hooks.clear_cache()
+        if hasattr(frappe.local, 'site_cache'):
+            frappe.local.site_cache.clear()
+        if hasattr(frappe.local, 'request_cache'):
+            frappe.local.request_cache.clear()
+        if hasattr(frappe, "client_cache") and hasattr(frappe.client_cache, "delete_value"):
+            frappe.client_cache.delete_value("app_hooks")
+        if hasattr(frappe, "cache") and hasattr(frappe.cache, "delete_value"):
+            frappe.cache.delete_value("app_hooks")
+        elif hasattr(frappe, "cache") and callable(frappe.cache):
+            frappe.cache().delete_value("app_hooks")
+        super().tearDown()
+
+    @patch("frappe_cadence.cadence.doctype.cadence_provider.cadence_provider.frappe.get_hooks")
     def test_get_provider_instance_success(self, mock_get_hooks):
         mock_get_hooks.return_value = {
             "Dummy": "frappe_cadence.tests.unit.cadence.doctype.cadence_provider.test_cadence_provider.DummyCadenceProvider"
@@ -18,7 +35,7 @@ class TestCadenceProviderInterface(UnitTestCase):
         provider = get_provider_instance("Dummy")
         self.assertIsInstance(provider, DummyCadenceProvider)
 
-    @patch("frappe.get_hooks")
+    @patch("frappe_cadence.cadence.doctype.cadence_provider.cadence_provider.frappe.get_hooks")
     def test_get_provider_instance_missing(self, mock_get_hooks):
         mock_get_hooks.return_value = {}
         
@@ -36,12 +53,44 @@ class TestCadenceProviderInterface(UnitTestCase):
         
         mock_provider.on_mcc_status_changed.assert_called_once_with(mcc_doc, "Draft", "Scheduled")
 
+    @patch("frappe_cadence.cadence.doctype.cadence_provider.cadence_provider.frappe.get_all")
+    @patch("frappe_cadence.cadence.doctype.cadence_provider.cadence_provider.broadcast_event")
+    def test_on_cadence_update_broadcasting(self, mock_broadcast_event, mock_get_all):
+        mock_get_all.return_value = ["Apollo", "TestProvider"]
+        
+        mock_doc = MagicMock()
+        on_cadence_update(mock_doc)
+        
+        mock_get_all.assert_called_once_with(
+            "Cadence Provider",
+            filters={"enabled": 1},
+            pluck="name"
+        )
+        self.assertEqual(mock_broadcast_event.call_count, 2)
+
 import unittest
 from unittest.mock import patch
 import hashlib
 from frappe_cadence.cadence.doctype.cadence_provider.cadence_provider import resolve_providers_for_mcc
 
 class TestProviderRouter(UnitTestCase):
+    def tearDown(self):
+        if hasattr(frappe, "_site_cached_load_app_hooks") and hasattr(frappe._site_cached_load_app_hooks, "clear_cache"):
+            frappe._site_cached_load_app_hooks.clear_cache()
+        if hasattr(frappe, "_request_cached_load_app_hooks") and hasattr(frappe._request_cached_load_app_hooks, "clear_cache"):
+            frappe._request_cached_load_app_hooks.clear_cache()
+        if hasattr(frappe.local, 'site_cache'):
+            frappe.local.site_cache.clear()
+        if hasattr(frappe.local, 'request_cache'):
+            frappe.local.request_cache.clear()
+        if hasattr(frappe, "client_cache") and hasattr(frappe.client_cache, "delete_value"):
+            frappe.client_cache.delete_value("app_hooks")
+        if hasattr(frappe, "cache") and hasattr(frappe.cache, "delete_value"):
+            frappe.cache.delete_value("app_hooks")
+        elif hasattr(frappe, "cache") and callable(frappe.cache):
+            frappe.cache().delete_value("app_hooks")
+        super().tearDown()
+
     @patch("frappe_cadence.cadence.doctype.cadence_provider.cadence_provider.frappe.get_all")
     def test_resolve_providers_for_mcc_deterministic_routing(self, mock_get_all):
         def mock_get_all_side_effect(doctype, *args, **kwargs):

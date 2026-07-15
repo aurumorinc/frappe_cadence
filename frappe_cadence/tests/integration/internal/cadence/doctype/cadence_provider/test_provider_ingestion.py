@@ -1,9 +1,14 @@
 import frappe
 from frappe.tests import IntegrationTestCase
-from frappe_cadence.cadence.doctype.cadence_provider.cadence_provider import CadenceProviderBase
+from frappe_cadence.cadence.doctype.cadence_provider.cadence_provider import BaseCadenceProvider
 from unittest.mock import patch, MagicMock
 
 class TestProviderIngestion(IntegrationTestCase):
+    @classmethod
+    def tearDownClass(cls):
+        frappe.db.rollback()
+        super().tearDownClass()
+
 
     @patch("frappe.utils.now")
     @patch("frappe.db.set_value")
@@ -12,7 +17,7 @@ class TestProviderIngestion(IntegrationTestCase):
         mock_doc = MagicMock()
         mock_get_doc.return_value = mock_doc
         
-        CadenceProviderBase.report_event("message_replied", {"mcc_name": "MCC-001"})
+        BaseCadenceProvider.report_event("message_replied", {"mcc_name": "MCC-001"})
         
         mock_set_value.assert_called_once_with("Multi Channel Cadence", "MCC-001", "status", "Replied")
         mock_doc.insert.assert_called_once()
@@ -24,7 +29,7 @@ class TestProviderIngestion(IntegrationTestCase):
         mock_doc = MagicMock()
         mock_get_doc.return_value = mock_doc
         
-        CadenceProviderBase.report_event("bounce", {"mcc_name": "MCC-001"})
+        BaseCadenceProvider.report_event("bounce", {"mcc_name": "MCC-001"})
         
         mock_set_value.assert_called_once_with("Multi Channel Cadence", "MCC-001", "status", "Bounced")
         mock_doc.insert.assert_called_once()
@@ -36,7 +41,7 @@ class TestProviderIngestion(IntegrationTestCase):
         mock_doc = MagicMock()
         mock_get_doc.return_value = mock_doc
         
-        CadenceProviderBase.report_event("message_sent", {"communication_name": "COMM-001", "mcc_name": "MCC-001"})
+        BaseCadenceProvider.report_event("message_sent", {"communication_name": "COMM-001", "mcc_name": "MCC-001"})
         
         mock_set_value.assert_called_once_with("Communication", "COMM-001", "delivery_status", "Sent")
         mock_doc.insert.assert_called_once()
@@ -44,7 +49,7 @@ class TestProviderIngestion(IntegrationTestCase):
         mock_set_value.reset_mock()
         mock_doc.insert.reset_mock()
         
-        CadenceProviderBase.report_event("message_opened", {"communication_name": "COMM-001", "mcc_name": "MCC-001"})
+        BaseCadenceProvider.report_event("message_opened", {"communication_name": "COMM-001", "mcc_name": "MCC-001"})
         
         mock_set_value.assert_called_once_with("Communication", "COMM-001", "read_status", "Read")
         mock_doc.insert.assert_called_once()

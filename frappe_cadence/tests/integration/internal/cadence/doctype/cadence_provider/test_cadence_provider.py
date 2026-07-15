@@ -1,8 +1,13 @@
 import frappe
 from frappe.tests import IntegrationTestCase
-from frappe_cadence.cadence.doctype.cadence_provider.cadence_provider import CadenceProviderBase
+from frappe_cadence.cadence.doctype.cadence_provider.cadence_provider import BaseCadenceProvider
 
 class TestCadenceProviderIntegration(IntegrationTestCase):
+    @classmethod
+    def tearDownClass(cls):
+        frappe.db.rollback()
+        super().tearDownClass()
+
     def setUp(self):
         existing_cadence = frappe.db.exists("Cadence", {"cadence_name": "Test Cadence"})
         if not existing_cadence:
@@ -41,7 +46,7 @@ class TestCadenceProviderIntegration(IntegrationTestCase):
 
     def test_report_event_replied(self):
         # Emulate webhook
-        CadenceProviderBase.report_event(
+        BaseCadenceProvider.report_event(
             event_type="message_replied",
             context={"mcc_name": self.mcc_name},
             data={"id": "evt_123"}
@@ -54,7 +59,7 @@ class TestCadenceProviderIntegration(IntegrationTestCase):
         # Verify History creation
         history = frappe.get_all("History", filters={
             "reference_doctype": "Multi Channel Cadence",
-            "reference_name": self.mcc_name,
-            "content": "Replied"
-        })
+            "reference_name": self.mcc_name
+        }, fields=["markdown"])
         self.assertTrue(len(history) > 0)
+        self.assertEqual(history[0].markdown, "Replied")

@@ -2,6 +2,11 @@ import frappe
 from frappe.tests import IntegrationTestCase
 
 class TestEnrichmentFlow(IntegrationTestCase):
+    @classmethod
+    def tearDownClass(cls):
+        frappe.db.rollback()
+        super().tearDownClass()
+
     def setUp(self):
         # Create test records needed
         if not frappe.db.exists("Email Template", "_Test Email Template Flow"):

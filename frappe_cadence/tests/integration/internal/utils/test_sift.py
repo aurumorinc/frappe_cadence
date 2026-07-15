@@ -62,7 +62,7 @@ class TestSiftIntegration(IntegrationTestCase):
             "reference_doctype": "CRM Lead",
             "reference_name": lead.name,
             "url": "http://test.com",
-            "content": "<p>History <em>test</em></p>"
+            "markdown": "<p>History <em>test</em></p>"
         })
         history.insert(ignore_permissions=True)
 
@@ -91,12 +91,21 @@ class TestSiftIntegration(IntegrationTestCase):
         mock_response.raise_for_status.return_value = None
         mock_post.return_value = mock_response
 
+        frappe.db.delete("User Bio", {"reference_user": "Administrator"})
+        frappe.get_doc({
+            "doctype": "User Bio",
+            "reference_user": "Administrator",
+            "is_default": 1,
+            "enabled": 1,
+            "content": "<p>This is a <strong>test</strong> bio.</p>"
+        }).insert(ignore_permissions=True)
+
         original_get_value = frappe.db.get_value
         def get_value_side_effect(*args, **kwargs):
             dt = args[0] if args else kwargs.get("doctype")
             fieldname = kwargs.get("fieldname") or (args[2] if len(args) > 2 else None)
-            if dt == "User" and isinstance(fieldname, list) and "bio" in fieldname:
-                return frappe._dict(name="Administrator", full_name="Sift Test", bio="<p>This is a <strong>test</strong> bio.</p>")
+            if dt == "User" and fieldname and "full_name" in fieldname:
+                return frappe._dict(name="Administrator", full_name="Sift Test")
             return original_get_value(*args, **kwargs)
 
         with patch.object(frappe.db, "get_value", side_effect=get_value_side_effect):

@@ -142,7 +142,7 @@ class TestSiftUtils(IntegrationTestCase):
         self.assertFalse(is_annotation_pending(self.annotation2))
         self.assertFalse(is_annotation_pending(self.whatsapp_annotation))
 
-    @patch("frappe_cadence.utils.sift.get_history")
+    @patch("frappe_cadence.cadence.doctype.history.history.get_history")
     @patch("frappe_cadence.utils.sift.requests.post")
     def test_optimize(self, mock_post, mock_get_history):
         mock_response = MagicMock()
@@ -151,11 +151,21 @@ class TestSiftUtils(IntegrationTestCase):
         
         mock_get_history.return_value = [{"role": "user", "content": [{"type": "text", "text": "test history"}]}]
         
+        frappe.db.delete("User Bio", {"reference_user": "test_sender@example.com"})
+        frappe.get_doc({
+            "doctype": "User Bio",
+            "reference_user": "test_sender@example.com",
+            "is_default": 1,
+            "enabled": 1,
+            "content": "<b>Bold Bio</b>"
+        }).insert(ignore_permissions=True, ignore_links=True)
+
         original_get_value = frappe.db.get_value
         def get_value_side_effect(*args, **kwargs):
             dt = args[0] if args else kwargs.get("doctype")
-            if dt == "User":
-                return {"full_name": "Test Sender", "bio": "<b>Bold Bio</b>"}
+            fieldname = kwargs.get("fieldname") or (args[2] if len(args) > 2 else None)
+            if dt == "User" and fieldname and "full_name" in fieldname:
+                return frappe._dict(name="test_sender@example.com", full_name="Test Sender")
             return original_get_value(*args, **kwargs)
             
         with patch.object(frappe.db, "get_value") as mock_get_value:
@@ -230,7 +240,7 @@ class TestSiftUtils(IntegrationTestCase):
         self.assertEqual(self.template.sift_id, "sift-agent-123")
         self.assertEqual(self.template.status, "Disabled")
 
-    @patch("frappe_cadence.utils.sift.get_history")
+    @patch("frappe_cadence.cadence.doctype.history.history.get_history")
     @patch("frappe_cadence.utils.sift.requests.post")
     def test_predict(self, mock_post, mock_get_history):
         mock_response = MagicMock()
@@ -242,11 +252,21 @@ class TestSiftUtils(IntegrationTestCase):
         # Ensure we have a sift_id
         self.template.db_set("sift_id", "sift-agent-123")
         
+        frappe.db.delete("User Bio", {"reference_user": "test_sender@example.com"})
+        frappe.get_doc({
+            "doctype": "User Bio",
+            "reference_user": "test_sender@example.com",
+            "is_default": 1,
+            "enabled": 1,
+            "content": "<b>Bold Bio</b>"
+        }).insert(ignore_permissions=True, ignore_links=True)
+
         original_get_value = frappe.db.get_value
         def get_value_side_effect(*args, **kwargs):
             dt = args[0] if args else kwargs.get("doctype")
-            if dt == "User":
-                return {"full_name": "Test Sender", "bio": "<b>Bold Bio</b>"}
+            fieldname = kwargs.get("fieldname") or (args[2] if len(args) > 2 else None)
+            if dt == "User" and fieldname and "full_name" in fieldname:
+                return frappe._dict(name="test_sender@example.com", full_name="Test Sender")
             return original_get_value(*args, **kwargs)
             
         with patch.object(frappe.db, "get_value") as mock_get_value:
