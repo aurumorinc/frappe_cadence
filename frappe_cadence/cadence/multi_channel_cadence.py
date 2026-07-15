@@ -98,26 +98,6 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
             cadence = frappe.get_doc("Multi Channel Cadence", cadence_name)
             lead = frappe.get_doc(cadence.cadence_for, cadence.recipient)
             
-            # Fetch History records
-            three_months_ago = add_months(today(), -3)
-            
-            # Get history for lead
-            history_filters = [
-                ["creation", ">=", three_months_ago],
-                ["reference_doctype", "=", cadence.cadence_for],
-                ["reference_name", "=", lead.name]
-            ]
-            histories = frappe.get_all("History", filters=history_filters, fields=["*"])
-            
-            # Get history for organization if it's a CRM Lead
-            if cadence.cadence_for == "CRM Lead" and lead.organization:
-                org_histories = frappe.get_all("History", filters=[
-                    ["creation", ">=", three_months_ago],
-                    ["reference_doctype", "=", "CRM Organization"],
-                    ["reference_name", "=", lead.organization]
-                ], fields=["*"])
-                histories.extend(org_histories)
-            
             schema_properties = {
                 "content": {
                     "type": "string",
@@ -153,10 +133,17 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
             }
             
             from markdownify import markdownify
+            from frappe_cadence.utils.sift import get_history
+            from frappe_cadence.utils.user_bio import get_user_bio
             
-            sender = frappe.db.get_value("User", mcc.owner, ["full_name", "bio"], as_dict=True) or {}
+            sender_bio_content = get_user_bio(mcc.owner, cadence_name)
+            if not sender_bio_content:
+                wait_for_event("user_bio_created", condition=f"argument.get('reference_user') == '{mcc.owner}'")
+                return
+                
+            sender = frappe.db.get_value("User", mcc.owner, ["full_name"], as_dict=True) or {}
             sender_name = sender.get("full_name") or ""
-            sender_bio = markdownify(sender.get("bio") or "")
+            sender_bio = markdownify(sender_bio_content)
             
             payload["input"] = []
             if sender_name or sender_bio:
@@ -165,30 +152,10 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
                     "content": f"Sender Name: {sender_name}\nSender Bio:\n{sender_bio}"
                 })
             
-            for history in histories:
-                content_blocks = []
-                if history.content:
-                    content_blocks.append({"type": "text", "text": markdownify(history.content)})
-                    
-                history_images = frappe.get_all(
-                    "History Image",
-                    filters={"parent": history.name, "parenttype": "History"},
-                    fields=["image"]
-                )
-                
-                for img in history_images:
-                    if img.image:
-                        try:
-                            file_doc = frappe.get_doc("File", {"file_url": img.image})
-                            content_blocks.append({
-                                "type": "image_url",
-                                "image_url": {"url": file_doc.presigned_url}
-                            })
-                        except frappe.DoesNotExistError:
-                            pass
-                
-                if content_blocks:
-                    payload["input"].append({"role": "user", "content": content_blocks})
+            # Fetch and format History records
+            three_months_ago = add_months(today(), -3)
+            history_messages = get_history(cadence.cadence_for, cadence.recipient, since_date=three_months_ago)
+            payload["input"].extend(history_messages)
 
             # Use /responses endpoint instead of /agents and map cadence model
             payload["model"] = cadence.sift_id or "default-model"
