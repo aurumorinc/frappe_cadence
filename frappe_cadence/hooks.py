@@ -137,9 +137,6 @@ doctype_list_js = {"Communication" : "cadence/doctype/communication/communicatio
 # Hook on document methods and events
 
 doc_events = {
-	"User": {
-		"validate": "frappe_cadence.cadence.doctype.user.user.validate_bio"
-	},
 	"Email Template": {
 		"before_save": [
 			"frappe_cadence.cadence.doctype.email_template.email_template.before_save"
@@ -174,6 +171,26 @@ controller_events = {
 	"frappe_cadence.cadence.multi_channel_cadence.process_cadence_step": {
 		"rate_limit_per_minute": 50,
 		"retries": 3,
+		"timeout": 300
+	},
+	"frappe_cadence.cadence.doctype.cadence_provider.cadence_provider.broadcast_event": {
+		"retries": 1,
+		"timeout": 60
+	},
+	"frappe_cadence.cadence.doctype.cadence_provider.cadence_provider.populate_mccs_with_new_provider": {
+		"retries": 1,
+		"timeout": 600
+	},
+	"frappe_cadence.cadence.doctype.cadence.cadence.update_sequences": {
+		"retries": 1,
+		"timeout": 600
+	},
+	"frappe_cadence.cadence.doctype.cadence.cadence.evaluate_cadence_for_leads": {
+		"retries": 1,
+		"timeout": 600
+	},
+	"frappe_cadence.cadence.doctype.cadence.cadence.evaluate_lead_for_cadences": {
+		"retries": 1,
 		"timeout": 300
 	}
 }
