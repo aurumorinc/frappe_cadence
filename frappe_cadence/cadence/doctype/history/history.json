@@ -7,8 +7,9 @@
  "engine": "InnoDB",
  "field_order": [
   "url",
-  "content",
-  "images",
+  "markdown",
+  "screenshot",
+  "html",
   "reference_doctype",
   "reference_name"
  ],
@@ -17,21 +18,25 @@
    "fieldname": "url",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "URL",
-   "reqd": 1
+   "label": "URL"
   },
   {
-   "fieldname": "content",
+   "fieldname": "markdown",
    "fieldtype": "Text Editor",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Content"
+   "label": "Markdown"
   },
   {
-   "fieldname": "images",
-   "fieldtype": "Table",
-   "label": "Images",
-   "options": "History Image"
+   "fieldname": "screenshot",
+   "fieldtype": "Attach Image",
+   "label": "Screenshot"
+  },
+  {
+   "fieldname": "html",
+   "fieldtype": "Code",
+   "options": "HTML",
+   "label": "HTML"
   },
   {
    "fieldname": "reference_doctype",
