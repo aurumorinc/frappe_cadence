@@ -4,6 +4,11 @@ import frappe
 from frappe_cadence.cadence.email_template import callback
 
 class TestCallback(IntegrationTestCase):
+    @classmethod
+    def tearDownClass(cls):
+        frappe.db.rollback()
+        super().tearDownClass()
+
     
     @patch("frappe_cadence.cadence.email_template.emit_event")
     @patch("frappe_cadence.cadence.email_template.frappe.get_doc")

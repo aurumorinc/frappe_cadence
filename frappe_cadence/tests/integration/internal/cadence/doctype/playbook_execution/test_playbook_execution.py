@@ -3,6 +3,11 @@ from frappe.tests import IntegrationTestCase
 from frappe_cadence.cadence.doctype.playbook_execution.playbook_execution import on_update
 
 class TestPlaybookExecutionHandoff(IntegrationTestCase):
+    @classmethod
+    def tearDownClass(cls):
+        frappe.db.rollback()
+        super().tearDownClass()
+
     def setUp(self):
         super().setUp()
 

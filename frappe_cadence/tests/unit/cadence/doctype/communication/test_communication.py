@@ -27,8 +27,7 @@ class TestCommunicationEvents(UnitTestCase):
             event_method="on_communication_status_changed",
             comm_doc=doc,
             old_status="Open",
-            new_status="Scheduled",
-            now=True
+            new_status="Scheduled"
         )
 
     @patch("frappe_cadence.cadence.doctype.communication.communication.enqueue")
@@ -46,6 +45,5 @@ class TestCommunicationEvents(UnitTestCase):
             queue="low",
             provider_name="SendGrid",
             event_method="on_communication_created",
-            comm_doc=doc,
-            now=True
+            comm_doc=doc
         )

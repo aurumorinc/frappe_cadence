@@ -152,9 +152,9 @@ class TestMultiChannelCadence(IntegrationTestCase):
         self.assertEqual(mock_enqueue.call_count, 3)
         
         calls = [
-            call("frappe_cadence.cadence.multi_channel_cadence.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[0].name, previous_schedule_name=None, now=True),
-            call("frappe_cadence.cadence.multi_channel_cadence.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[1].name, previous_schedule_name=self.master_cadence.cadence_schedules[0].name, now=True),
-            call("frappe_cadence.cadence.multi_channel_cadence.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[2].name, previous_schedule_name=self.master_cadence.cadence_schedules[1].name, now=True)
+            call("frappe_cadence.cadence.multi_channel_cadence.process_cadence_step", queue="medium", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[0].name, previous_schedule_name=None),
+            call("frappe_cadence.cadence.multi_channel_cadence.process_cadence_step", queue="medium", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[1].name, previous_schedule_name=self.master_cadence.cadence_schedules[0].name),
+            call("frappe_cadence.cadence.multi_channel_cadence.process_cadence_step", queue="medium", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[2].name, previous_schedule_name=self.master_cadence.cadence_schedules[1].name)
         ]
         mock_enqueue.assert_has_calls(calls)
 
@@ -180,8 +180,8 @@ class TestMultiChannelCadence(IntegrationTestCase):
         self.assertEqual(mock_enqueue.call_count, 2)
         
         calls = [
-            call("frappe_cadence.cadence.multi_channel_cadence.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[1].name, previous_schedule_name=self.master_cadence.cadence_schedules[0].name, now=True),
-            call("frappe_cadence.cadence.multi_channel_cadence.process_cadence_step", queue="default", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[2].name, previous_schedule_name=self.master_cadence.cadence_schedules[1].name, now=True)
+            call("frappe_cadence.cadence.multi_channel_cadence.process_cadence_step", queue="medium", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[1].name, previous_schedule_name=self.master_cadence.cadence_schedules[0].name),
+            call("frappe_cadence.cadence.multi_channel_cadence.process_cadence_step", queue="medium", cadence_name=self.cadence.name, schedule_name=self.master_cadence.cadence_schedules[2].name, previous_schedule_name=self.master_cadence.cadence_schedules[1].name)
         ]
         mock_enqueue.assert_has_calls(calls)
 

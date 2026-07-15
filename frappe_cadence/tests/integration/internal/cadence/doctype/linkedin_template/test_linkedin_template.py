@@ -14,6 +14,11 @@ IGNORE_TEST_RECORD_DEPENDENCIES = []  # eg. ["User"]
 
 
 class IntegrationTestLinkedInTemplate(IntegrationTestCase):
+	@classmethod
+	def tearDownClass(cls):
+		frappe.db.rollback()
+		super().tearDownClass()
+
 	"""
 	Integration tests for LinkedInTemplate.
 	Use this class for testing interactions between multiple components.
