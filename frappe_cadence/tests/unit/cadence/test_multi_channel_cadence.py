@@ -78,13 +78,13 @@ class TestMultiChannelCadence(UnitTestCase):
         mock_comm.insert.assert_called_once_with(ignore_permissions=True)
         mock_emit_event.assert_called_once_with("cadence_step_completed", {"cadence_name": "MCC-001", "schedule_name": "SCHED-001"})
 
-    @patch("frappe_cadence.utils.sift.get_history")
+    @patch("frappe_cadence.cadence.doctype.history.history.get_history")
     @patch("frappe_cadence.cadence.multi_channel_cadence.requests.post")
     @patch("frappe_cadence.cadence.multi_channel_cadence.wait_for_event")
     @patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_all")
     @patch("frappe_cadence.cadence.multi_channel_cadence.get_url")
     @patch("frappe_cadence.cadence.multi_channel_cadence.add_months")
-    @patch("frappe_cadence.utils.user_bio.get_user_bio")
+    @patch("frappe_cadence.cadence.doctype.user_bio.user_bio.get_user_bio")
     def test_process_cadence_step_sift_integration(self, mock_get_user_bio, mock_add_months, mock_get_url, mock_get_all, mock_wait_for_event, mock_post, mock_get_history):
         mock_get_user_bio.return_value = "<p>I am a <strong>bold</strong> user.</p>"
         mock_get_url.return_value = "http://test.com/webhook"
@@ -203,12 +203,12 @@ class TestMultiChannelCadence(UnitTestCase):
                         condition="argument.get('communication_id') == 'COMM-001'"
                     )
 
-    @patch("frappe_cadence.utils.sift.get_history")
+    @patch("frappe_cadence.cadence.doctype.history.history.get_history")
     @patch("frappe_cadence.cadence.multi_channel_cadence.requests.post")
     @patch("frappe_cadence.cadence.multi_channel_cadence.wait_for_event")
     @patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_all")
     @patch("frappe_cadence.cadence.multi_channel_cadence.get_url")
-    @patch("frappe_cadence.utils.user_bio.get_user_bio")
+    @patch("frappe_cadence.cadence.doctype.user_bio.user_bio.get_user_bio")
     def test_process_cadence_step_sift_payload_markdown(self, mock_get_user_bio, mock_get_url, mock_get_all, mock_wait_for_event, mock_post, mock_get_history):
         mock_get_url.return_value = "http://test.com/webhook"
         from frappe_cadence.cadence.multi_channel_cadence import process_cadence_step

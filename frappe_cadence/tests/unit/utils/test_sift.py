@@ -142,7 +142,7 @@ class TestSiftUtils(IntegrationTestCase):
         self.assertFalse(is_annotation_pending(self.annotation2))
         self.assertFalse(is_annotation_pending(self.whatsapp_annotation))
 
-    @patch("frappe_cadence.utils.sift.get_history")
+    @patch("frappe_cadence.cadence.doctype.history.history.get_history")
     @patch("frappe_cadence.utils.sift.requests.post")
     def test_optimize(self, mock_post, mock_get_history):
         mock_response = MagicMock()
@@ -240,7 +240,7 @@ class TestSiftUtils(IntegrationTestCase):
         self.assertEqual(self.template.sift_id, "sift-agent-123")
         self.assertEqual(self.template.status, "Disabled")
 
-    @patch("frappe_cadence.utils.sift.get_history")
+    @patch("frappe_cadence.cadence.doctype.history.history.get_history")
     @patch("frappe_cadence.utils.sift.requests.post")
     def test_predict(self, mock_post, mock_get_history):
         mock_response = MagicMock()

@@ -67,7 +67,7 @@ class TestUserBio(UnitTestCase):
                 self.assertTrue(doc.has_permission("read"))
 
     def test_get_user_bio_precedence(self):
-        from frappe_cadence.utils.user_bio import get_user_bio
+        from frappe_cadence.cadence.doctype.user_bio.user_bio import get_user_bio
         
         with patch("frappe.get_all") as mock_get_all:
             # Scenario 1: Both specific and default bio exist

@@ -488,7 +488,7 @@ class TestAgentUtils(IntegrationTestCase):
         self.assertNotIn("subject", schema["required"])
         self.assertIn("content", schema["required"])
 
-    @patch("frappe_cadence.utils.sift.get_history")
+    @patch("frappe_cadence.cadence.doctype.history.history.get_history")
     @patch("frappe_cadence.cadence.multi_channel_cadence.requests.post")
     @patch("frappe_cadence.cadence.multi_channel_cadence.wait_for_event")
     @patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_all")
@@ -521,7 +521,7 @@ class TestAgentUtils(IntegrationTestCase):
         
         mock_get_history.return_value = [{"role": "user", "content": [{"type": "text", "text": "A very important email."}, {"type": "image_url", "image_url": {"url": "https://s3.example.com/test_image_for_sift.png?sig=123"}}]}]
         
-        with patch("frappe_cadence.utils.user_bio.get_user_bio", return_value="<p>I am a <strong>bold</strong> user.</p>"):
+        with patch("frappe_cadence.cadence.doctype.user_bio.user_bio.get_user_bio", return_value="<p>I am a <strong>bold</strong> user.</p>"):
             with patch("frappe_cadence.cadence.multi_channel_cadence.frappe.get_doc") as mock_get_doc:
                 mock_schedule = frappe._dict(reference_doctype="Email Template", reference_name="Test Email Template")
                 mock_template = frappe._dict(status="Prompt", annotations=[frappe._dict(input="")])
