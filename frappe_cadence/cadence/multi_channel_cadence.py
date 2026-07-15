@@ -133,8 +133,8 @@ def process_cadence_step(cadence_name, schedule_name, previous_schedule_name=Non
             }
             
             from markdownify import markdownify
-            from frappe_cadence.utils.sift import get_history
-            from frappe_cadence.utils.user_bio import get_user_bio
+            from frappe_cadence.cadence.doctype.history.history import get_history
+            from frappe_cadence.cadence.doctype.user_bio.user_bio import get_user_bio
             
             sender_bio_content = get_user_bio(mcc.owner, cadence_name)
             if not sender_bio_content:
