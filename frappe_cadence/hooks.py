@@ -140,18 +140,30 @@ doc_events = {
 	"Email Template": {
 		"before_save": [
 			"frappe_cadence.cadence.doctype.email_template.email_template.before_save"
+		],
+		"on_update": [
+			"frappe_cadence.cadence.doctype.email_template.email_template.on_update"
 		]
 	},
+	"SMS Template": {
+		"on_update": "frappe_cadence.cadence.doctype.sms_template.sms_template.on_update"
+	},
+	"LinkedIn Template": {
+		"on_update": "frappe_cadence.cadence.doctype.linkedin_template.linkedin_template.on_update"
+	},
+	"WhatsApp Template": {
+		"on_update": "frappe_cadence.cadence.doctype.whatsapp_template.whatsapp_template.on_update"
+	},
 	"Email Cadence": {
-		"after_insert": "frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.sync_lead_cadence",
-		"on_update": "frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.sync_lead_cadence",
-		"on_trash": "frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.remove_lead_cadence"
+		"after_insert": "frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.on_update",
+		"on_update": "frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.on_update",
+		"on_trash": "frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.on_trash"
 	},
 	"CRM Lead": {
-		"on_update": "frappe_cadence.cadence.doctype.cadence.cadence.enqueue_lead_evaluation"
+		"on_update": "frappe_cadence.cadence.doctype.cadence.cadence.on_update"
 	},
 	"Communication": {
-		"after_insert": "frappe_cadence.cadence.doctype.communication.communication.on_communication_create",
+		"after_insert": "frappe_cadence.cadence.doctype.communication.communication.after_communication_insert",
 		"on_update": "frappe_cadence.cadence.doctype.communication.communication.on_communication_update"
 	},
 	"Playbook Execution": {

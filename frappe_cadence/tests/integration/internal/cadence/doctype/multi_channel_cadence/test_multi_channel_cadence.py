@@ -117,33 +117,6 @@ class TestMultiChannelCadence(IntegrationTestCase):
             frappe.delete_doc("Multi Channel Cadence", self.cadence.name, ignore_permissions=True, force=True)
 
     @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.enqueue")
-    def test_on_update_cancels_existing_jobs(self, mock_enqueue):
-        self.cadence.insert(ignore_permissions=True)
-        mock_enqueue.reset_mock()
-        
-        # Create dummy FS Jobs
-        job1 = frappe.get_doc({
-            "doctype": "FS Job",
-            "status": "queued",
-            "job_type": self.cjt_name,
-            "arguments": json.dumps({"cadence_name": self.cadence.name})
-        }).insert(ignore_permissions=True)
-        
-        job2 = frappe.get_doc({
-            "doctype": "FS Job",
-            "status": "started",
-            "job_type": self.cjt_name,
-            "arguments": json.dumps({"cadence_name": self.cadence.name})
-        }).insert(ignore_permissions=True)
-        
-        # Trigger on_update
-        self.cadence.on_update()
-        
-        # Assert jobs are cancelled
-        self.assertEqual(frappe.db.get_value("FS Job", job1.name, "status"), "canceled")
-        self.assertEqual(frappe.db.get_value("FS Job", job2.name, "status"), "canceled")
-
-    @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.enqueue")
     def test_on_update_enqueues_all_steps_initially(self, mock_enqueue):
         self.cadence.insert(ignore_permissions=True)
         mock_enqueue.reset_mock()
@@ -346,6 +319,34 @@ class TestAgentUtils(IntegrationTestCase):
         frappe.conf["cadence_agent_webhook_secret"] = "test"
 
     @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.wait_for_event")
+    def test_process_step_waits_for_mcc_status(self, mock_wait):
+        # Set MCC status to Draft
+        frappe.db.set_value("Multi Channel Cadence", self.cadence_name, "status", "Draft")
+        
+        process_schedule(self.cadence_name, self.schedule_name, self.prev_schedule_name)
+        
+        mock_wait.assert_called_once_with(
+            event_key="mcc_scheduled",
+            condition=f"argument.get('doctype') == 'Multi Channel Cadence' and argument.get('name') == '{self.cadence_name}'"
+        )
+        
+        # Restore status
+        frappe.db.set_value("Multi Channel Cadence", self.cadence_name, "status", "Scheduled")
+
+    @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.emit_event")
+    def test_on_update_emits_resume_event(self, mock_emit):
+        # Set to Draft first
+        frappe.db.set_value("Multi Channel Cadence", self.cadence_name, "status", "Draft")
+        mcc = frappe.get_doc("Multi Channel Cadence", self.cadence_name)
+        
+        # Now save as Scheduled (resume)
+        mcc.status = "Scheduled"
+        mcc.save(ignore_permissions=True)
+        
+        # Assert event was emitted instead of enqueue
+        mock_emit.assert_called_with("mcc_scheduled", {"doctype": "Multi Channel Cadence", "name": self.cadence_name})
+
+    @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.wait_for_event")
     def test_process_step_waits_for_previous_step(self, mock_wait):
         process_schedule(self.cadence_name, self.schedule_name, self.prev_schedule_name)
         mock_wait.assert_called_once_with(
@@ -402,6 +403,29 @@ class TestAgentUtils(IntegrationTestCase):
         process_schedule(self.cadence_name, self.schedule_name)
         mock_emit.assert_called_once_with("cadence_step_completed", {"cadence_name": self.cadence_name, "schedule_name": self.schedule_name})
 
+    @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.wait_for_event")
+    def test_process_step_waits_for_template_enabled(self, mock_wait):
+        original_get_doc = frappe.get_doc
+        with patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.frappe.get_doc") as mock_get_doc:
+            mock_schedule = frappe._dict(reference_doctype="Email Template", reference_name="Test Email Template")
+            mock_template = frappe._dict(status="Disabled", subject="Test", message="Test Content")
+            mock_cadence = frappe._dict(owner=self.mcc.owner, cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id", status="Scheduled")
+            
+            def side_effect(*args, **kwargs):
+                dt = args[0] if args else kwargs.get("doctype")
+                if dt == "Cadence Multi Channel Schedule": return mock_schedule
+                if dt == "Email Template": return mock_template
+                if dt == "Multi Channel Cadence": return mock_cadence
+                return original_get_doc(*args, **kwargs)
+            mock_get_doc.side_effect = side_effect
+            
+            process_schedule(self.cadence_name, self.schedule_name)
+            
+        mock_wait.assert_called_once_with(
+            event_key="email_template_enabled",
+            condition=f"argument.get('doctype') == 'Email Template' and argument.get('name') == 'Test Email Template' and argument.get('enabled') == 1"
+        )
+
     @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.emit_event")
     def test_process_step_enabled_template(self, mock_emit):
         original_get_doc = frappe.get_doc
@@ -440,7 +464,7 @@ class TestAgentUtils(IntegrationTestCase):
             
             mock_schedule = frappe._dict(reference_doctype="Email Template", reference_name="Test Email Template")
             mock_template = frappe._dict(status="Prompt", subject="Test", annotations=[frappe._dict(input="")])
-            mock_cadence = frappe._dict(owner=self.mcc.owner, cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id")
+            mock_cadence = frappe._dict(owner=self.mcc.owner, cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id", status="Scheduled")
             mock_lead = frappe._dict(name=self.lead_name, organization=None)
             
             def side_effect(*args, **kwargs):
@@ -492,7 +516,7 @@ class TestAgentUtils(IntegrationTestCase):
             
             mock_schedule = frappe._dict(reference_doctype="Email Template", reference_name="Test Email Template")
             mock_template = frappe._dict(status="Prompt", subject="Test", annotations=[frappe._dict(input="")])
-            mock_cadence = frappe._dict(owner=self.mcc.owner, cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id")
+            mock_cadence = frappe._dict(owner=self.mcc.owner, cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id", status="Scheduled")
             mock_lead = frappe._dict(name=self.lead_name, organization=None)
             
             def side_effect(*args, **kwargs):
@@ -542,7 +566,7 @@ class TestAgentUtils(IntegrationTestCase):
         with patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.frappe.get_doc") as mock_get_doc:
             mock_schedule = frappe._dict(reference_doctype="Email Template", reference_name="Test Email Template")
             mock_template = frappe._dict(status="Prompt", subject="Test")
-            mock_cadence = frappe._dict(owner=self.mcc.owner, cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id")
+            mock_cadence = frappe._dict(owner=self.mcc.owner, cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id", status="Scheduled")
             mock_lead = frappe._dict(name=self.lead_name, organization=None)
             
             def side_effect(*args, **kwargs):
@@ -581,7 +605,7 @@ class TestAgentUtils(IntegrationTestCase):
             
             mock_schedule = frappe._dict(reference_doctype="Email Template", reference_name="Test Email Template")
             mock_template = frappe._dict(status="Prompt", subject="Test", annotations=[frappe._dict(input="")])
-            mock_cadence = frappe._dict(owner=self.mcc.owner, cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id")
+            mock_cadence = frappe._dict(owner=self.mcc.owner, cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id", status="Scheduled")
             mock_lead = frappe._dict(name=self.lead_name, organization=None)
             
             def side_effect(*args, **kwargs):
@@ -633,7 +657,7 @@ class TestAgentUtils(IntegrationTestCase):
         with patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.frappe.get_doc") as mock_get_doc:
             mock_schedule = frappe._dict(reference_doctype="Email Template", reference_name="Test Email Template")
             mock_template = frappe._dict(status="Prompt", subject="Test", annotations=[frappe._dict(input="")])
-            mock_cadence = frappe._dict(owner=self.mcc.owner, cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id")
+            mock_cadence = frappe._dict(owner=self.mcc.owner, cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id", status="Scheduled")
             mock_lead = frappe._dict(name=self.lead_name, organization=None)
             
             def side_effect(*args, **kwargs):
@@ -677,7 +701,7 @@ class TestAgentUtils(IntegrationTestCase):
             
             mock_schedule = frappe._dict(reference_doctype="LinkedIn Template", reference_name="Test LinkedIn Template")
             mock_template = frappe._dict(status="Prompt", annotations=[frappe._dict(input="")])
-            mock_cadence = frappe._dict(cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id")
+            mock_cadence = frappe._dict(cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id", status="Scheduled")
             mock_lead = frappe._dict(name=self.lead_name, organization=None)
             
             def side_effect(*args, **kwargs):
@@ -735,7 +759,7 @@ class TestAgentUtils(IntegrationTestCase):
             with patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.frappe.get_doc") as mock_get_doc:
                 mock_schedule = frappe._dict(reference_doctype="Email Template", reference_name="Test Email Template")
                 mock_template = frappe._dict(status="Prompt", annotations=[frappe._dict(input="")])
-                mock_cadence = frappe._dict(cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_model_123", owner="user@test.com")
+                mock_cadence = frappe._dict(cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_model_123", owner="user@test.com", status="Scheduled")
                 mock_lead = frappe._dict(name=self.lead_name, organization=None)
                 
                 def side_effect(*args, **kwargs):

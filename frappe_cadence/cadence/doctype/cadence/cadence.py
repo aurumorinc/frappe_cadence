@@ -166,7 +166,7 @@ class Cadence(Document):
 
 import json
 
-def enqueue_lead_evaluation(doc, method):
+def on_update(doc, method):
 	"""Enqueues the lead for cadence evaluation."""
 	from frappe_controller.utils.background_jobs import enqueue
 
