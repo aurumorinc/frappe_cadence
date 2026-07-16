@@ -87,7 +87,7 @@ class MultiChannelCadence(Document):
                     "frappe_cadence.cadence.doctype.cadence_provider.cadence_provider.broadcast_event",
                     queue="low",
                     provider_name=provider,
-                    event_method="on_mcc_status_changed",
+                    event_method="on_mcc_update",
                     mcc_doc=self,
                     old_status=old_status,
                     new_status=self.status

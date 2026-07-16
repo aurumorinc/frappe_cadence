@@ -80,7 +80,7 @@ class TestMultiChannelCadence(UnitTestCase):
         enqueued_providers = []
         for call in mock_enqueue.call_args_list:
             kwargs = call[1]
-            if kwargs.get("event_method") == "on_mcc_status_changed":
+            if kwargs.get("event_method") == "on_mcc_update":
                 enqueued_providers.append(kwargs.get("provider_name"))
         
         self.assertIn("Apollo", enqueued_providers)
@@ -115,7 +115,7 @@ class TestMultiChannelCadenceLifecycle(UnitTestCase):
             "frappe_cadence.cadence.doctype.cadence_provider.cadence_provider.broadcast_event",
             queue="low",
             provider_name="Dummy",
-            event_method="on_mcc_status_changed",
+            event_method="on_mcc_update",
             mcc_doc=mcc,
             old_status="Draft",
             new_status="Scheduled"

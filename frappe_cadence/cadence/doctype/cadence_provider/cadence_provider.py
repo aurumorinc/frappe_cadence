@@ -59,16 +59,16 @@ class BaseCadenceProvider:
     def on_mcc_created(self, mcc_doc):
         pass
 
-    def on_mcc_status_changed(self, mcc_doc, old_status, new_status):
+    def on_mcc_update(self, mcc_doc, old_status, new_status):
         pass
 
     def on_cadence_update(self, doc, method=None):
         pass
 
-    def after_communication_insertd(self, comm_doc):
+    def after_insertd(self, comm_doc):
         pass
 
-    def on_communication_status_changed(self, comm_doc, old_status, new_status):
+    def on_communication_update(self, comm_doc, old_status, new_status):
         pass
 
     @classmethod

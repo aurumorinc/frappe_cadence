@@ -163,8 +163,8 @@ doc_events = {
 		"on_update": "frappe_cadence.cadence.doctype.cadence.cadence.on_update"
 	},
 	"Communication": {
-		"after_insert": "frappe_cadence.cadence.doctype.communication.communication.after_communication_insert",
-		"on_update": "frappe_cadence.cadence.doctype.communication.communication.on_communication_update"
+		"after_insert": "frappe_cadence.cadence.doctype.communication.communication.after_insert",
+		"on_update": "frappe_cadence.cadence.doctype.communication.communication.on_update"
 	},
 	"Playbook Execution": {
 		"on_update": "frappe_cadence.cadence.doctype.playbook_execution.playbook_execution.on_update"

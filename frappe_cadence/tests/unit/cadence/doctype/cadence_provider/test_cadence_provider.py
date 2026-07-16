@@ -4,7 +4,7 @@ from frappe_cadence.cadence.doctype.cadence_provider.cadence_provider import Bas
 from unittest.mock import patch, MagicMock
 
 class DummyCadenceProvider(BaseCadenceProvider):
-    def on_mcc_status_changed(self, mcc_doc, old_status, new_status):
+    def on_mcc_update(self, mcc_doc, old_status, new_status):
         pass
 
 class TestCadenceProviderInterface(UnitTestCase):
@@ -49,9 +49,9 @@ class TestCadenceProviderInterface(UnitTestCase):
         
         mcc_doc = MagicMock()
         
-        broadcast_event("Dummy", "on_mcc_status_changed", mcc_doc, "Draft", "Scheduled")
+        broadcast_event("Dummy", "on_mcc_update", mcc_doc, "Draft", "Scheduled")
         
-        mock_provider.on_mcc_status_changed.assert_called_once_with(mcc_doc, "Draft", "Scheduled")
+        mock_provider.on_mcc_update.assert_called_once_with(mcc_doc, "Draft", "Scheduled")
 
     @patch("frappe_cadence.cadence.doctype.cadence_provider.cadence_provider.frappe.get_all")
     @patch("frappe_cadence.cadence.doctype.cadence_provider.cadence_provider.broadcast_event")
