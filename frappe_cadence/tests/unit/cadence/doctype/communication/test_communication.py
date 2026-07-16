@@ -44,6 +44,6 @@ class TestCommunicationEvents(UnitTestCase):
             "frappe_cadence.cadence.doctype.cadence_provider.cadence_provider.broadcast_event",
             queue="low",
             provider_name="SendGrid",
-            event_method="after_insertd",
+            event_method="after_communication_insert",
             comm_doc=doc
         )
