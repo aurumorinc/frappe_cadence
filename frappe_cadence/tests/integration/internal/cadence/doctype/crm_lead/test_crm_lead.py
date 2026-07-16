@@ -1,90 +1,179 @@
 import frappe
 from frappe.tests import IntegrationTestCase
-from frappe_cadence.crm_lead import get as get_crm_leads
 
-class TestCRMLead(IntegrationTestCase):
+class TestCRMLeadQuery(IntegrationTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        
-        # 1. Create Organizations
-        cls.org1 = frappe.get_doc({
-            "doctype": "CRM Organization",
-            "organization_name": "_Test Org 1"
-        }).insert(ignore_permissions=True, ignore_mandatory=True, ignore_links=True)
-        
-        cls.org2 = frappe.get_doc({
-            "doctype": "CRM Organization",
-            "organization_name": "_Test Org 2"
-        }).insert(ignore_permissions=True, ignore_mandatory=True, ignore_links=True)
-        
-        # 2. Create Cadence
-        cls.cadence1 = frappe.get_doc({
-            "doctype": "Cadence",
-            "cadence_name": "_Test Cadence 1"
-        }).insert(ignore_permissions=True, ignore_mandatory=True, ignore_links=True)
-        
-        # 3. Create Leads
-        cls.lead1 = frappe.get_doc({
-            "doctype": "CRM Lead",
-            "first_name": "Test Lead 1",
-            "source": "Cold Email",
-            "email": "test1@example.com",
-            "organization": cls.org1.name
-        }).insert(ignore_permissions=True, ignore_mandatory=True, ignore_links=True)
-        
-        cls.lead2 = frappe.get_doc({
-            "doctype": "CRM Lead",
-            "first_name": "Test Lead 2",
-            "source": "Cold Email",
-            "email": "test2@example.com",
-            "organization": cls.org2.name
-        }).insert(ignore_permissions=True, ignore_mandatory=True, ignore_links=True)
-        
-        cls.lead3 = frappe.get_doc({
-            "doctype": "CRM Lead",
-            "first_name": "Test Lead 3",
-            "source": "Website",
-            "email": "test3@example.com",
-            "organization": cls.org2.name
-        }).insert(ignore_permissions=True, ignore_mandatory=True, ignore_links=True)
-        
-        # 4. Link Lead 1 to Cadence 1
-        frappe.get_doc({
-            "doctype": "CRM Lead Cadence",
-            "parent": cls.lead1.name,
-            "parenttype": "CRM Lead",
-            "parentfield": "cadences",
-            "cadence_name": cls.cadence1.name
-        }).insert(ignore_permissions=True, ignore_mandatory=True, ignore_links=True)
 
     @classmethod
     def tearDownClass(cls):
         frappe.db.rollback()
         super().tearDownClass()
 
-    def test_get_leads_without_cadence_exclusion(self):
-        filters = '[["CRM Lead", "source", "=", "Cold Email"]]'
-        leads = get_crm_leads(filters=filters, fields='["name", "organization"]')
-        
-        lead_names = [l.name for l in leads]
-        self.assertIn(self.lead1.name, lead_names)
-        self.assertIn(self.lead2.name, lead_names)
-        self.assertNotIn(self.lead3.name, lead_names)
+    def setUp(self):
+        # Clear test records
+        frappe.db.delete("History")
+        frappe.db.delete("CRM Lead")
+        frappe.db.delete("CRM Organization")
 
-    def test_get_leads_with_cadence_exclusion(self):
-        # We simulate the exact n8n filter
-        filters = f'[["CRM Lead Cadence", "name", "not in", ["{self.cadence1.name}"]], ["CRM Lead", "source", "=", "Cold Email"]]'
-        leads = get_crm_leads(filters=filters, fields='["name", "organization"]')
-        
-        # lead1 should be excluded because it's in _Test Cadence 1
-        lead_names = [l.name for l in leads]
-        self.assertNotIn(self.lead1.name, lead_names)
-        self.assertIn(self.lead2.name, lead_names)
+    def tearDown(self):
+        frappe.db.rollback()
 
-    def test_get_leads_with_limit(self):
-        # We have lead1 and lead2 with Cold Email source
-        filters = '[["CRM Lead", "source", "=", "Cold Email"]]'
-        leads = get_crm_leads(filters=filters, fields='["name"]', limit=1)
+    def test_get_crm_leads(self):
+        leads = []
+        for i in range(1, 4):
+            lead = frappe.get_doc({
+                "doctype": "CRM Lead",
+                "first_name": f"Test{i}",
+                "email_id": f"test{i}@example.com"
+            }).insert(ignore_permissions=True)
+            leads.append(lead.name)
+
+        if not frappe.db.exists("Email Template", "_Test Email Template"):
+            frappe.get_doc({
+                "doctype": "Email Template",
+                "name": "_Test Email Template",
+                "subject": "Test",
+                "response": "Test"
+            }).insert(ignore_permissions=True)
+
+        cadence = frappe.get_doc({
+            "doctype": "Cadence",
+            "cadence_name": "Test Cadence Enrich",
+            "cadence_schedules": [
+                {
+                    "reference_doctype": "Email Template",
+                    "reference_name": "_Test Email Template",
+                    "send_after_days": 1
+                }
+            ]
+        }).insert(ignore_permissions=True)
+            
+        mcc_data = [
+            ("Draft", leads[0]),
+            ("Provisioning", leads[1]),
+            ("Error", leads[2])
+        ]
         
-        self.assertEqual(len(leads), 1)
+        for status, lead_name in mcc_data:
+            frappe.get_doc({
+                "doctype": "Multi Channel Cadence",
+                "cadence_name": cadence.name,
+                "recipient": lead_name,
+                "status": status,
+                "start_date": frappe.utils.nowdate()
+            }).insert(ignore_permissions=True)
+            
+        from frappe_cadence.cadence.doctype.crm_lead.crm_lead import get_crm_leads
+        
+        results = get_crm_leads(
+            doctype="Email Template Annotation",
+            txt="",
+            searchfield="name",
+            start=0,
+            page_len=20,
+            filters={"template_name": "_Test Email Template"}
+        )
+        
+        lead_names = [r[0] for r in results]
+        
+        self.assertIn(leads[0], lead_names)
+        self.assertNotIn(leads[1], lead_names)
+        self.assertNotIn(leads[2], lead_names)
+
+class TestEnrichmentFlow(IntegrationTestCase):
+    @classmethod
+    def tearDownClass(cls):
+        frappe.db.rollback()
+        super().tearDownClass()
+
+    def setUp(self):
+        # Create test records needed
+        if not frappe.db.exists("Email Template", "_Test Email Template Flow"):
+            frappe.get_doc({
+                "doctype": "Email Template",
+                "name": "_Test Email Template Flow",
+                "subject": "Test",
+                "response": "Test"
+            }).insert(ignore_permissions=True)
+            
+        lead = frappe.get_doc({
+            "doctype": "CRM Lead",
+            "email_id": "flowtest@example.com",
+            "first_name": "Flow"
+        }).insert(ignore_permissions=True)
+        self.lead_name = lead.name
+            
+        if not frappe.db.exists("User", "test_flow@example.com"):
+            frappe.get_doc({
+                "doctype": "User",
+                "email": "test_flow@example.com",
+                "first_name": "Flow",
+                "send_welcome_email": 0
+            }).insert(ignore_permissions=True)
+            
+    def test_enrichment_pipeline(self):
+        # 1. Create a Cadence
+        cadence = frappe.get_doc({
+            "doctype": "Cadence",
+            "cadence_name": "Test Cadence Flow",
+            "cadence_code": "CAD-TEST-FLOW",
+            "cadence_schedules": [
+                {
+                    "reference_doctype": "Email Template",
+                    "reference_name": "_Test Email Template Flow",
+                    "send_after_days": 1
+                }
+            ],
+            "users": [
+                {"user": "test_flow@example.com"}
+            ]
+        }).insert(ignore_permissions=True)
+        
+        # Verify Playbook creation
+        self.assertTrue(cadence.reference_playbook)
+        playbook = frappe.get_doc("Playbook", cadence.reference_playbook)
+        self.assertEqual(playbook.document_type, "Multi Channel Cadence")
+        
+        # 2. Trigger lead assignment
+        from frappe_cadence.cadence.doctype.cadence.cadence import add_lead_to_cadence
+        add_lead_to_cadence(cadence, self.lead_name)
+        
+        mcc_records = frappe.get_all("Multi Channel Cadence", filters={"cadence_name": cadence.name, "recipient": self.lead_name})
+        self.assertEqual(len(mcc_records), 1)
+        mcc = frappe.get_doc("Multi Channel Cadence", mcc_records[0].name)
+        
+        # Verify default status is Provisioning
+        self.assertEqual(mcc.status, "Provisioning")
+        
+        # 3. Try to get leads for annotation
+        from frappe_cadence.cadence.doctype.crm_lead.crm_lead import get_crm_leads
+        results = get_crm_leads(
+            doctype="Email Template Annotation",
+            txt="",
+            searchfield="name",
+            start=0,
+            page_len=20,
+            filters={"template_name": "_Test Email Template Flow"}
+        )
+        
+        # Lead should NOT appear yet because it's Provisioning
+        lead_names = [r[0] for r in results]
+        self.assertNotIn(self.lead_name, lead_names)
+        
+        # 4. Simulate Playbook completion by setting to Draft
+        mcc.status = "Draft"
+        mcc.save(ignore_permissions=True)
+        
+        # 5. Lead should now appear
+        results = get_crm_leads(
+            doctype="Email Template Annotation",
+            txt="",
+            searchfield="name",
+            start=0,
+            page_len=20,
+            filters={"template_name": "_Test Email Template Flow"}
+        )
+        lead_names = [r[0] for r in results]
+        self.assertIn(self.lead_name, lead_names)
