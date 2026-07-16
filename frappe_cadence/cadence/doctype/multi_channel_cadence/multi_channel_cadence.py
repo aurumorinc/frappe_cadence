@@ -125,7 +125,7 @@ class MultiChannelCadence(Document):
                         previous_schedule_name = cadence.cadence_schedules[idx - 1].name if idx > 0 else None
                         
                         enqueue(
-                            "frappe_cadence.cadence.multi_channel_cadence.process_cadence_step",
+                            "frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.process_schedule",
                             queue="medium",
                             cadence_name=self.name,
                             schedule_name=schedule.name,
