@@ -1,7 +1,7 @@
 # Copyright (c) 2026, Aurumor and Contributors
 # See license.txt
 
-# import frappe
+import frappe
 from frappe.tests import IntegrationTestCase
 
 
@@ -24,4 +24,20 @@ class IntegrationTestLinkedInTemplate(IntegrationTestCase):
 	Use this class for testing interactions between multiple components.
 	"""
 
-	pass
+	def test_sift_id_in_linkedin_template(self):
+		import frappe
+		doc = frappe.get_doc({
+			"doctype": "LinkedIn Template",
+			"title": "_Test LinkedIn Template",
+			"status": "Enabled",
+			"message": "Hello from LinkedIn",
+			"sift_id": "sift_lin_123"
+		}).insert(ignore_permissions=True)
+		
+		reloaded_doc = frappe.get_doc("LinkedIn Template", doc.name)
+		self.assertEqual(reloaded_doc.sift_id, "sift_lin_123")
+		
+		meta = frappe.get_meta("LinkedIn Template")
+		field = meta.get_field("sift_id")
+		self.assertIsNotNone(field)
+		self.assertTrue(field.hidden)

@@ -168,7 +168,7 @@ scheduler_events = {}
 # -----------------
 
 controller_events = {
-	"frappe_cadence.cadence.multi_channel_cadence.process_cadence_step": {
+	"frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.process_schedule": {
 		"rate_limit_per_minute": 50,
 		"retries": 3,
 		"timeout": 300
@@ -291,3 +291,4 @@ fixtures = [
 	{"dt": "Custom Field", "filters": [["module", "in", ["Cadence", "CRM"]]]},
 	{"dt": "Property Setter", "filters": [["module", "in", ["Cadence"]]]}
 ]
+
