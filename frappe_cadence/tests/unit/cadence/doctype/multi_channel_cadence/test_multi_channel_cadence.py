@@ -233,6 +233,7 @@ class TestMultiChannelCadence(UnitTestCase):
         mock_schedule.reference_name = "Template-001"
         
         mock_mcc = MagicMock()
+        mock_mcc.status = "Scheduled"
         row = MagicMock()
         row.channel = "Email"
         row.cadence_provider = "Apollo"
@@ -298,6 +299,7 @@ class TestMultiChannelCadence(UnitTestCase):
         mock_schedule.reference_name = "Template-002"
         
         mock_mcc = MagicMock()
+        mock_mcc.status = "Scheduled"
         mock_mcc.cadence_for = "CRM Lead"
         mock_mcc.recipient = "LEAD-001"
         mock_mcc.owner = "user@test.com"
@@ -420,6 +422,7 @@ class TestMultiChannelCadence(UnitTestCase):
         mock_schedule.reference_name = "Template-003"
         
         mock_mcc = MagicMock()
+        mock_mcc.status = "Scheduled"
         mock_mcc.cadence_for = "CRM Lead"
         mock_mcc.recipient = "LEAD-002"
         mock_mcc.owner = "user@test.com"
