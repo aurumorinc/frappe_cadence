@@ -2,7 +2,6 @@ import frappe
 from frappe.tests import IntegrationTestCase
 from unittest.mock import patch, call
 import json
-
 class TestMultiChannelCadence(IntegrationTestCase):
     @classmethod
     def setUpClass(cls):
@@ -446,6 +445,49 @@ class TestAgentUtils(IntegrationTestCase):
         self.assertTrue(comm)
         mock_emit.assert_called_once_with("cadence_step_completed", {"cadence_name": self.cadence_name, "schedule_name": self.schedule_name})
 
+    @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.emit_event")
+    @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.wait_for_event")
+    def test_end_to_end_wakeup_execution(self, mock_wait, mock_emit):
+        original_get_doc = frappe.get_doc
+        with patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.frappe.get_doc") as mock_get_doc:
+            mock_schedule = frappe._dict(reference_doctype="Email Template", reference_name="Test Email Template")
+            mock_template = frappe._dict(status="Disabled", subject="Test", message="Test Content")
+            mock_cadence = frappe._dict(owner=self.mcc.owner, cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id", status="Scheduled")
+            
+            def side_effect(*args, **kwargs):
+                dt = args[0] if args else kwargs.get("doctype")
+                if dt == "Cadence Multi Channel Schedule": return mock_schedule
+                if dt == "Email Template": return mock_template
+                if dt == "Multi Channel Cadence": return mock_cadence
+                return original_get_doc(*args, **kwargs)
+            mock_get_doc.side_effect = side_effect
+            
+            # Step 1: Execution while Disabled
+            process_schedule(self.cadence_name, self.schedule_name)
+            
+        mock_wait.assert_called_once()
+        mock_emit.assert_not_called()
+        
+        # Step 2: Simulate Wakeup (Re-execution after status changed)
+        mock_wait.reset_mock()
+        with patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.frappe.get_doc") as mock_get_doc:
+            mock_template_enabled = frappe._dict(status="Enabled", subject="Test", message="Test Content")
+            
+            def side_effect_enabled(*args, **kwargs):
+                dt = args[0] if args else kwargs.get("doctype")
+                if dt == "Cadence Multi Channel Schedule": return mock_schedule
+                if dt == "Email Template": return mock_template_enabled
+                if dt == "Multi Channel Cadence": return mock_cadence
+                return original_get_doc(*args, **kwargs)
+            mock_get_doc.side_effect = side_effect_enabled
+            
+            process_schedule(self.cadence_name, self.schedule_name)
+            
+        mock_wait.assert_not_called()
+        comm = frappe.get_all("Communication", filters={"cadence_schedule": self.schedule_name})
+        self.assertTrue(comm)
+        mock_emit.assert_called_once_with("cadence_step_completed", {"cadence_name": self.cadence_name, "schedule_name": self.schedule_name})
+
     @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.requests.post")
     @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.wait_for_event")
     @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.frappe.get_all")
@@ -532,6 +574,47 @@ class TestAgentUtils(IntegrationTestCase):
             
         mock_post.assert_not_called()
         mock_wait.assert_called_once()
+
+    @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.wait_for_event")
+    @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.frappe.get_all")
+    def test_process_step_missing_bio_yields(self, mock_get_all, mock_wait):
+        def get_all_side_effect(doctype, *args, **kwargs):
+            if doctype == "User Bio":
+                return [] # Return empty bio
+            return []
+        mock_get_all.side_effect = get_all_side_effect
+        
+        # Create draft communication
+        frappe.get_doc({
+            "doctype": "Communication",
+            "communication_medium": "Email",
+            "subject": "Test",
+            "reference_doctype": "Multi Channel Cadence",
+            "reference_name": self.cadence_name,
+            "cadence_schedule": self.schedule_name,
+            "status": "Open"
+        }).insert(ignore_permissions=True)
+        
+        original_get_doc = frappe.get_doc
+        with patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.frappe.get_doc") as mock_get_doc:
+            mock_schedule = frappe._dict(reference_doctype="Email Template", reference_name="Test Email Template")
+            mock_template = frappe._dict(status="Prompt", subject="Test", annotations=[frappe._dict(input="")])
+            mock_cadence = frappe._dict(owner=self.mcc.owner, cadence_for="CRM Lead", recipient=self.lead_name, name=self.cadence_name, sift_id="test_sift_id", status="Scheduled")
+            mock_lead = frappe._dict(name=self.lead_name, organization=None)
+            
+            def side_effect(*args, **kwargs):
+                dt = args[0] if args else kwargs.get("doctype")
+                if dt == "Cadence Multi Channel Schedule": return mock_schedule
+                if dt == "Email Template": return mock_template
+                if dt == "Multi Channel Cadence": return mock_cadence
+                if dt == "CRM Lead": return mock_lead
+                return original_get_doc(*args, **kwargs)
+            mock_get_doc.side_effect = side_effect
+            
+            with patch("frappe_cadence.cadence.doctype.user_bio.user_bio.get_user_bio", return_value=""):
+                process_schedule(self.cadence_name, self.schedule_name)
+            
+        mock_wait.assert_called_once_with("user_bio_created", condition=f"argument.get('reference_user') == '{self.mcc.owner}'")
 
     @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.frappe.log_error")
     @patch("frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.requests.post")

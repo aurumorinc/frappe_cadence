@@ -7,11 +7,23 @@ class TestCadenceIntegration(IntegrationTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        cls.patcher = patch('frappe_controller.utils.controller.emit_event')
+        cls.mock_emit = cls.patcher.start()
+        cls.patcher2 = patch('frappe.utils.global_search.sync_value_in_queue')
+        cls.mock_gs = cls.patcher2.start()
+        cls.patcher3 = patch('frappe.enqueue')
+        cls.mock_enq = cls.patcher3.start()
+        cls.patcher4 = patch('frappe_controller.utils.background_jobs.enqueue')
+        cls.mock_fc_enq = cls.patcher4.start()
         from frappe.tests.utils import make_test_records
         make_test_records("CRM Lead Status")
 
     @classmethod
     def tearDownClass(cls):
+        cls.patcher.stop()
+        cls.patcher2.stop()
+        cls.patcher3.stop()
+        cls.patcher4.stop()
         frappe.db.rollback()
         super().tearDownClass()
 
@@ -108,6 +120,139 @@ class TestCadenceIntegration(IntegrationTestCase):
         })
         self.assertTrue(len(mcc) > 0, "Multi Channel Cadence was not spawned for the JSON lead.")
 
+    def test_idempotency_enrollment(self):
+        cadence = frappe.get_doc({
+            "doctype": "Cadence",
+            "cadence_name": f"Test Idempotency Cadence {frappe.generate_hash()}",
+            "assign_condition": 'doc.status == "New"',
+            "status": "Enabled"
+        }).insert(ignore_permissions=True)
+
+        lead = frappe.get_doc({
+            "doctype": "CRM Lead",
+            "first_name": "Test",
+            "lead_name": f"Test Idempotency Lead {frappe.generate_hash()}",
+            "status": "New"
+        }).insert(ignore_permissions=True, ignore_links=True, ignore_mandatory=True)
+
+        from frappe_cadence.cadence.doctype.cadence.cadence import evaluate_lead_for_cadences
+        evaluate_lead_for_cadences(lead.name)
+        evaluate_lead_for_cadences(lead.name)
+
+        mccs = frappe.get_all("Multi Channel Cadence", filters={
+            "cadence_name": cadence.name,
+            "recipient": lead.name
+        })
+        self.assertEqual(len(mccs), 1, "Expected exactly 1 MCC, but idempotency failed.")
+
+    def test_round_robin_assignment(self):
+        # Create Users
+        users = []
+        for i in range(3):
+            email = f"rr_user_{i}@example.com"
+            if not frappe.db.exists("User", email):
+                frappe.get_doc({"doctype": "User", "email": email, "first_name": f"RR {i}", "send_welcome_email": 0}).insert(ignore_permissions=True)
+            users.append(email)
+
+        cadence = frappe.get_doc({
+            "doctype": "Cadence",
+            "cadence_name": f"Test RR Cadence {frappe.generate_hash()}",
+            "assign_condition": 'doc.status == "New"',
+            "status": "Enabled",
+            "rule": "Round Robin"
+        })
+        for u in users:
+            cadence.append("users", {"user": u})
+        cadence.insert(ignore_permissions=True)
+
+        from frappe_cadence.cadence.doctype.cadence.cadence import add_lead_to_cadence
+        
+        assigned_users = []
+        for i in range(4):
+            lead = frappe.get_doc({
+                "doctype": "CRM Lead",
+                "lead_name": f"Test RR Lead {i} {frappe.generate_hash()}",
+                "status": "New"
+            }).insert(ignore_permissions=True, ignore_links=True, ignore_mandatory=True)
+            
+            add_lead_to_cadence(cadence, lead.name)
+            
+            # Re-fetch the cadence to get the updated last_user
+            cadence.reload()
+            
+            mccs = frappe.get_all("Multi Channel Cadence", filters={"cadence_name": cadence.name, "recipient": lead.name}, fields=["sender"])
+            assigned_users.append(mccs[0].sender)
+            
+        self.assertEqual(assigned_users[0], users[0])
+        self.assertEqual(assigned_users[1], users[1])
+        self.assertEqual(assigned_users[2], users[2])
+        self.assertEqual(assigned_users[3], users[0])
+
+    def test_load_balancing_assignment(self):
+        # Create Users
+        users = []
+        for i in range(2):
+            email = f"lb_user_{i}@example.com"
+            if not frappe.db.exists("User", email):
+                frappe.get_doc({"doctype": "User", "email": email, "first_name": f"LB {i}", "send_welcome_email": 0}).insert(ignore_permissions=True)
+            users.append(email)
+
+        cadence = frappe.get_doc({
+            "doctype": "Cadence",
+            "cadence_name": f"Test LB Cadence {frappe.generate_hash()}",
+            "assign_condition": 'doc.status == "New"',
+            "status": "Enabled",
+            "rule": "Load Balancing"
+        })
+        for u in users:
+            cadence.append("users", {"user": u})
+        cadence.insert(ignore_permissions=True)
+
+        # Manually create 5 active MCCs for User A and 1 for User B
+        for i in range(5):
+            dummy_a = frappe.get_doc({
+                "doctype": "CRM Lead",
+                "lead_name": f"Dummy Lead A {i} {frappe.generate_hash()}"
+            }).insert(ignore_permissions=True, ignore_links=True, ignore_mandatory=True)
+            
+            frappe.get_doc({
+                "doctype": "Multi Channel Cadence",
+                "cadence_name": cadence.name,
+                "cadence_for": "CRM Lead",
+                "recipient": dummy_a.name,
+                "sender": users[0],
+                "status": "In Progress"
+            }).insert(ignore_permissions=True)
+            
+        dummy_b = frappe.get_doc({
+            "doctype": "CRM Lead",
+            "lead_name": f"Dummy Lead B 0 {frappe.generate_hash()}"
+        }).insert(ignore_permissions=True, ignore_links=True, ignore_mandatory=True)
+        
+        frappe.get_doc({
+            "doctype": "Multi Channel Cadence",
+            "cadence_name": cadence.name,
+            "cadence_for": "CRM Lead",
+            "recipient": dummy_b.name,
+            "sender": users[1],
+            "status": "In Progress"
+        }).insert(ignore_permissions=True)
+
+        from frappe_cadence.cadence.doctype.cadence.cadence import add_lead_to_cadence
+        
+        lead = frappe.get_doc({
+            "doctype": "CRM Lead",
+            "lead_name": f"Test LB Lead {frappe.generate_hash()}",
+            "status": "New"
+        }).insert(ignore_permissions=True, ignore_links=True, ignore_mandatory=True)
+        
+        add_lead_to_cadence(cadence, lead.name)
+        
+        mccs = frappe.get_all("Multi Channel Cadence", filters={"cadence_name": cadence.name, "recipient": lead.name}, fields=["sender"])
+        
+        # User B should be assigned because they have 1 vs User A's 5
+        self.assertEqual(mccs[0].sender, users[1])
+
     def test_evaluate_cadence_invalid_json(self):
         # Create a Cadence with invalid JSON assignment rule
         cadence = frappe.get_doc({
@@ -158,6 +303,14 @@ class TestCadenceAstOrm(IntegrationTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
+        cls.patcher = patch('frappe_controller.utils.controller.emit_event')
+        cls.mock_emit = cls.patcher.start()
+        cls.patcher2 = patch('frappe.utils.global_search.sync_value_in_queue')
+        cls.mock_gs = cls.patcher2.start()
+        cls.patcher3 = patch('frappe.enqueue')
+        cls.mock_enq = cls.patcher3.start()
+        cls.patcher4 = patch('frappe_controller.utils.background_jobs.enqueue')
+        cls.mock_fc_enq = cls.patcher4.start()
         
         frappe.db.rollback()
 
@@ -189,6 +342,10 @@ class TestCadenceAstOrm(IntegrationTestCase):
 
     @classmethod
     def tearDownClass(cls):
+        cls.patcher.stop()
+        cls.patcher2.stop()
+        cls.patcher3.stop()
+        cls.patcher4.stop()
         frappe.db.rollback()
         frappe.db.delete("CRM Lead", {"lead_name": ("like", "%AST 1%")})
         frappe.db.delete("Cadence", {"cadence_name": ("like", "%Test AST ORM%")})
