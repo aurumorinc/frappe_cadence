@@ -93,45 +93,51 @@ class MultiChannelCadence(Document):
                     new_status=self.status
                 )
 
-        # Always enqueue steps; Frappe orchestrates delays.
-        if self.status in ["Scheduled", "In Progress"]:
-            # Cancel Existing Jobs
-            jobs = frappe.get_all("FS Job", filters={"status": ["in", ["queued", "started"]]}, fields=["name", "arguments"])
-            for job in jobs:
-                import json
-                try:
-                    kwargs = json.loads(job.arguments)
-                    if kwargs.get("cadence_name") == self.name:
-                        frappe.db.set_value("FS Job", job.name, "status", "canceled")
-                except Exception:
-                    pass
-            
-            # Enqueue New Jobs
-            for idx, schedule in enumerate(cadence.cadence_schedules):
-                # Check if a Communication record exists for this cadence_name and schedule_name
-                comm = frappe.get_all("Communication", filters={
-                    "reference_doctype": "Multi Channel Cadence",
-                    "reference_name": self.name,
-                    "cadence_schedule": schedule.name
-                }, fields=["name", "delivery_status"])
+            if self.status in ["Scheduled", "In Progress"]:
+                existing_jobs = False
+                jobs = frappe.get_all("FS Job", filters={"status": ["in", ["queued", "started", "deferred"]]}, fields=["name", "arguments"])
+                for job in jobs:
+                    import json
+                    try:
+                        kwargs = json.loads(job.arguments)
+                        if kwargs.get("cadence_name") == self.name:
+                            existing_jobs = True
+                            break
+                    except Exception:
+                        pass
                 
-                if comm:
-                    if comm[0].delivery_status == "Sent":
-                        continue # Skip this schedule
-                    else:
-                        frappe.delete_doc("Communication", comm[0].name)
-                
-                previous_schedule_name = cadence.cadence_schedules[idx - 1].name if idx > 0 else None
-                
-                enqueue(
-                    "frappe_cadence.cadence.doctype.multi_channel_cadence.multi_channel_cadence.process_schedule",
-                    queue="medium",
-                    cadence_name=self.name,
-                    schedule_name=schedule.name,
-                    previous_schedule_name=previous_schedule_name
-                )
+                if not existing_jobs:
+                    # Enqueue New Jobs
+                    for idx, schedule in enumerate(cadence.cadence_schedules):
+                        # Check if a Communication record exists for this cadence_name and schedule_name
+                        comm = frappe.get_all("Communication", filters={
+                            "reference_doctype": "Multi Channel Cadence",
+                            "reference_name": self.name,
+                            "cadence_schedule": schedule.name
+                        }, fields=["name", "delivery_status"])
+                        
+                        if comm:
+                            if comm[0].delivery_status == "Sent":
+                                continue # Skip this schedule
+                            else:
+                                frappe.delete_doc("Communication", comm[0].name)
+                        
+                        previous_schedule_name = cadence.cadence_schedules[idx - 1].name if idx > 0 else None
+                        
+                        enqueue(
+                            "frappe_cadence.cadence.multi_channel_cadence.process_cadence_step",
+                            queue="medium",
+                            cadence_name=self.name,
+                            schedule_name=schedule.name,
+                            previous_schedule_name=previous_schedule_name
+                        )
+                else:
+                    if self.status == "Scheduled":
+                        emit_event("mcc_scheduled", {"doctype": self.doctype, "name": self.name})
+                    elif self.status == "In Progress":
+                        emit_event("mcc_in_progress", {"doctype": self.doctype, "name": self.name})
 
-def sync_lead_cadence(doc, method):
+def on_update(doc, method):
  """Update the hidden 'cadences' child table on CRM Lead for filtering purposes"""
  if getattr(doc, "cadence_for", getattr(doc, "email_cadence_for", None)) == "CRM Lead":
   if not frappe.db.exists("CRM Lead", doc.recipient):
@@ -149,7 +155,7 @@ def sync_lead_cadence(doc, method):
    })
    lead.save(ignore_permissions=True)
 
-def remove_lead_cadence(doc, method):
+def on_trash(doc, method):
  """Remove the reference from CRM Lead when an Email Cadence is deleted"""
  if getattr(doc, "cadence_for", getattr(doc, "email_cadence_for", None)) == "CRM Lead":
   if not frappe.db.exists("CRM Lead", doc.recipient):
@@ -178,7 +184,16 @@ def process_schedule(cadence_name, schedule_name, previous_schedule_name=None):
     Processes a single step in a multi-channel cadence.
     Must be idempotent as it executes from line 1 when resumed.
     """
-    # 1. Wait for Previous Step
+    # 1. MCC State Check
+    mcc = frappe.get_doc("Multi Channel Cadence", cadence_name)
+    if mcc.status not in ["Scheduled", "In Progress"]:
+        wait_for_event(
+            event_key="mcc_scheduled" if mcc.status != "In Progress" else "mcc_in_progress",
+            condition=f"argument.get('doctype') == 'Multi Channel Cadence' and argument.get('name') == '{cadence_name}'"
+        )
+        return
+
+    # 2. Wait for Previous Step
     if previous_schedule_name:
         prev_comm = frappe.get_all("Communication", filters={
             "reference_doctype": "Multi Channel Cadence",
@@ -193,7 +208,7 @@ def process_schedule(cadence_name, schedule_name, previous_schedule_name=None):
             )
             return
 
-    # 2. Idempotency Check
+    # 3. Idempotency Check
     curr_comm = frappe.get_all("Communication", filters={
         "reference_doctype": "Multi Channel Cadence",
         "reference_name": cadence_name,
@@ -204,14 +219,21 @@ def process_schedule(cadence_name, schedule_name, previous_schedule_name=None):
         emit_event("cadence_step_completed", {"cadence_name": cadence_name, "schedule_name": schedule_name})
         return
 
-    # 3. Process Template
+    # 4. Template State Check & Process Template
     schedule = frappe.get_doc("Cadence Multi Channel Schedule", schedule_name)
-    mcc = frappe.get_doc("Multi Channel Cadence", cadence_name)
     
     template_doctype = f"{schedule.reference_doctype}"
     template_name = schedule.reference_name
     template = frappe.get_doc(template_doctype, template_name)
     
+    if template.status == "Disabled":
+        event_key = f"{template_doctype.lower().replace(' ', '_')}_enabled"
+        wait_for_event(
+            event_key=event_key,
+            condition=f"argument.get('doctype') == '{template_doctype}' and argument.get('name') == '{template_name}' and argument.get('enabled') == 1"
+        )
+        return
+
     channel = template_doctype.replace(" Template", "")
 
     reference_cadence_provider = None

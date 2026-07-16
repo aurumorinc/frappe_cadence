@@ -18,7 +18,7 @@ def on_communication_update(doc, method=None):
                     new_status=new_status
                 )
 
-def on_communication_create(doc, method=None):
+def after_communication_insert(doc, method=None):
     if doc.reference_doctype == "Multi Channel Cadence" and doc.reference_name:
         provider_name = doc.get("reference_cadence_provider")
         if provider_name:
@@ -26,6 +26,6 @@ def on_communication_create(doc, method=None):
                 "frappe_cadence.cadence.doctype.cadence_provider.cadence_provider.broadcast_event",
                 queue="low",
                 provider_name=provider_name,
-                event_method="on_communication_created",
+                event_method="after_communication_insertd",
                 comm_doc=doc
             )

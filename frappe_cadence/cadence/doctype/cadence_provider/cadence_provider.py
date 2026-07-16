@@ -65,7 +65,7 @@ class BaseCadenceProvider:
     def on_cadence_update(self, doc, method=None):
         pass
 
-    def on_communication_created(self, comm_doc):
+    def after_communication_insertd(self, comm_doc):
         pass
 
     def on_communication_status_changed(self, comm_doc, old_status, new_status):

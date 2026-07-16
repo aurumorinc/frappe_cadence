@@ -87,3 +87,34 @@ class TestEmailTemplate(IntegrationTestCase):
         field = meta.get_field("sift_id")
         self.assertIsNotNone(field)
         self.assertTrue(field.hidden)
+
+    @patch("frappe_controller.utils.controller.emit_event")
+    def test_emit_event_on_template_enable(self, mock_emit):
+        if not frappe.db.exists("Email Template", "Test Event Emit Template"):
+            doc = frappe.get_doc({
+                "doctype": "Email Template",
+                "name": "Test Event Emit Template",
+                "subject": "Test",
+                "response": "Test Content",
+                "status": "Disabled"
+            }).insert(ignore_permissions=True)
+        else:
+            doc = frappe.get_doc("Email Template", "Test Event Emit Template")
+            doc.status = "Disabled"
+            doc.save(ignore_permissions=True)
+            
+        mock_emit.reset_mock()
+        
+        # Change status to Enabled
+        doc.status = "Enabled"
+        doc.save(ignore_permissions=True)
+        
+        # Should emit event with structured payload
+        mock_emit.assert_any_call(
+            key="email_template_enabled",
+            argument={
+                "doctype": "Email Template",
+                "name": "Test Event Emit Template",
+                "enabled": 1
+            }
+        )
