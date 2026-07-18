@@ -10,6 +10,7 @@ class TestCadenceProviderIntegration(IntegrationTestCase):
         super().tearDownClass()
 
     def setUp(self):
+        super().setUp()
         existing_cadence = frappe.db.exists("Cadence", {"cadence_name": "Test Cadence"})
         if not existing_cadence:
             cadence = frappe.get_doc({
@@ -44,6 +45,10 @@ class TestCadenceProviderIntegration(IntegrationTestCase):
             self.mcc_name = mcc_doc.name
         else:
             self.mcc_name = mcc[0].name
+
+    def tearDown(self):
+        frappe.db.rollback()
+        super().tearDown()
 
     def test_report_event_replied(self):
         # Emulate webhook

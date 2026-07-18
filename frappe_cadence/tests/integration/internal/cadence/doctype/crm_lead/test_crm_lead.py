@@ -12,13 +12,11 @@ class TestCRMLeadQuery(IntegrationTestCase):
         super().tearDownClass()
 
     def setUp(self):
-        # Clear test records
-        frappe.db.delete("History")
-        frappe.db.delete("CRM Lead")
-        frappe.db.delete("CRM Organization")
+        super().setUp()
 
     def tearDown(self):
         frappe.db.rollback()
+        super().tearDown()
 
     def test_get_crm_leads(self):
         leads = []
@@ -89,6 +87,7 @@ class TestEnrichmentFlow(IntegrationTestCase):
         super().tearDownClass()
 
     def setUp(self):
+        super().setUp()
         # Create test records needed
         if not frappe.db.exists("Email Template", "_Test Email Template Flow"):
             frappe.get_doc({
@@ -112,6 +111,10 @@ class TestEnrichmentFlow(IntegrationTestCase):
                 "first_name": "Flow",
                 "send_welcome_email": 0
             }).insert(ignore_permissions=True)
+
+    def tearDown(self):
+        frappe.db.rollback()
+        super().tearDown()
             
     def test_enrichment_pipeline(self):
         # 1. Create a Cadence

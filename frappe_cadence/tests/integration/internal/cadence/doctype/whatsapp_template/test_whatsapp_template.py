@@ -19,6 +19,13 @@ class IntegrationTestWhatsAppTemplate(IntegrationTestCase):
 		frappe.db.rollback()
 		super().tearDownClass()
 
+	def setUp(self):
+		super().setUp()
+
+	def tearDown(self):
+		frappe.db.rollback()
+		super().tearDown()
+
 	"""
 	Integration tests for WhatsAppTemplate.
 	Use this class for testing interactions between multiple components.
