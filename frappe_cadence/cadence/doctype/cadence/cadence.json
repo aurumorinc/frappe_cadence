@@ -11,6 +11,7 @@
  "field_order": [
   "cadence",
   "cadence_name",
+  "enabled",
   "reference_playbook",
   "naming_series",
   "cadence_code",
@@ -40,6 +41,12 @@
    "oldfieldname": "cadence_name",
    "oldfieldtype": "Data",
    "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
   },
   {
    "fieldname": "reference_playbook",
