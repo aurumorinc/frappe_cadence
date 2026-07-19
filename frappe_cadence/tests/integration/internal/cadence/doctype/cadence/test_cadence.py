@@ -311,9 +311,18 @@ class TestCadenceAstOrm(IntegrationTestCase):
         cls.mock_enq = cls.patcher3.start()
         cls.patcher4 = patch('frappe_controller.utils.background_jobs.enqueue')
         cls.mock_fc_enq = cls.patcher4.start()
-        
-        frappe.db.rollback()
 
+    @classmethod
+    def tearDownClass(cls):
+        cls.patcher.stop()
+        cls.patcher2.stop()
+        cls.patcher3.stop()
+        cls.patcher4.stop()
+        frappe.db.rollback()
+        super().tearDownClass()
+
+    def setUp(self):
+        super().setUp()
         # Insert diverse CRM Leads to test all operators
         frappe.get_doc({
             "doctype": "CRM Lead",
@@ -338,19 +347,6 @@ class TestCadenceAstOrm(IntegrationTestCase):
             "annual_revenue": 50000,
             "email": "test3@example.com"
         }).insert(ignore_permissions=True, ignore_links=True, ignore_mandatory=True)
-        frappe.db.commit()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.patcher.stop()
-        cls.patcher2.stop()
-        cls.patcher3.stop()
-        cls.patcher4.stop()
-        frappe.db.rollback()
-        frappe.db.delete("CRM Lead", {"lead_name": ("like", "%AST 1%")})
-        frappe.db.delete("Cadence", {"cadence_name": ("like", "%Test AST ORM%")})
-        frappe.db.commit()
-        super().tearDownClass()
         
     def tearDown(self):
         frappe.db.rollback()
