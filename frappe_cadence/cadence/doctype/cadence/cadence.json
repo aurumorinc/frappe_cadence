@@ -131,6 +131,7 @@
   {
    "fieldname": "last_user",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Last User",
    "options": "User",
    "read_only": 1
